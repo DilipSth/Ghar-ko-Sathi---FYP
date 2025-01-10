@@ -1,9 +1,9 @@
 import axios from "axios";
 import { useState } from "react";
-import { FaEnvelope, FaLock, FaGoogle, FaFacebook } from "react-icons/fa"; // Importing icons
+import { FaEnvelope, FaLock, FaGoogle, FaFacebook } from "react-icons/fa";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/authContext";
-import { NavLink } from 'react-router-dom';
+import { NavLink } from "react-router-dom";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -38,12 +38,13 @@ const Login = () => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gradient-to-r from-sky-500 to-blue-600 relative overflow-hidden">
-      {/* Decorative shapes */}
+    <div className="relative flex flex-col md:flex-row h-screen bg-gradient-to-r from-sky-500 to-blue-600 overflow-hidden">
+      {/* Decorative Shapes */}
       <div className="absolute top-0 left-0 w-1/2 h-full bg-blue-300 opacity-30 rounded-full transform -translate-x-1/4"></div>
       <div className="absolute bottom-0 right-0 w-1/2 h-full bg-blue-300 opacity-30 rounded-full transform translate-x-1/4"></div>
 
-      <div className="flex-1 flex justify-center items-center text-white p-10">
+      {/* Welcome Section */}
+      <div className="relative z-10 flex-1 flex justify-center items-center text-white p-10">
         <div>
           <h1 className="text-5xl font-extrabold mb-4">
             Welcome to Ghar Ko Sathi!
@@ -55,8 +56,9 @@ const Login = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex justify-center items-center p-5">
-        {error && <p className="text-red-500">{error}</p>}
+      {/* Login Form Section */}
+      <div className="relative z-10 flex-1 flex justify-center items-center p-5">
+        {error && <p className="text-red-500 mb-4">{error}</p>}
         <form
           className="w-full max-w-lg p-8 bg-white border border-gray-300 rounded-lg shadow-lg transform transition-transform"
           onSubmit={handleSubmit}
@@ -113,27 +115,18 @@ const Login = () => {
 
           {/* Social Media Login Options */}
           <div className="flex justify-between mt-4">
-            <button className="flex items-center justify-center w-full p-2 mr-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration=200">
+            <button className="flex items-center justify-center w-full p-2 mr-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-200">
               <FaGoogle className="mr-2" /> Google
             </button>
-            <button className="flex items-center justify-center w-full p-2 ml-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition duration=200">
+            <button className="flex items-center justify-center w-full p-2 ml-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition duration-200">
               <FaFacebook className="mr-2" /> Facebook
             </button>
           </div>
 
-          {/* Forgot Password Link */}
-          {/* <p className="mt-4 text-center text-sm">
-            Forgot your password?
-            <a href="/reset-password" className="text-blue-600 hover:underline">
-              {" "}
-              Reset it here
-            </a>
-          </p> */}
-
           {/* Sign Up Link */}
           <p className="mt-8 text-center text-sm">
-            Don&apos;t have an account?
-            <NavLink to="/login" className="text-blue-600 hover:underline">
+            Don&apos;t have an account?{" "}
+            <NavLink to="/signup" className="text-blue-600 hover:underline">
               Sign Up
             </NavLink>
           </p>

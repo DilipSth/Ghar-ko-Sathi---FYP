@@ -9,7 +9,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ["admin", "serviceProvider", "user"],
     required: true,
+    default: "user",
   },
+  dob: { type: Date, required: true },
+  gender: { type: String, required: true },
+  image: { type: String },
   createAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
