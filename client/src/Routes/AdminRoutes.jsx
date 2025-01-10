@@ -10,10 +10,7 @@ import PrivateRoutes from "../utils/PrivateRoutes";
 import RoleBaseRoutes from "../utils/RoleBaseRoutes";
 import AddServices from "../Pages/Menu/Services/AddServices";
 import Maps from "../Pages/Menu/Map/Maps";
-import GharUsers from "../Pages/Menu/Users/GharUsers";
-import AddGharUsers from "../Pages/Menu/Users/AddGharUsers";
-import GharUser from "../Pages/Menu/Users/GharUser";
-import UpdateUser from "../Pages/Menu/Users/UpdateUser";
+
 import Signup from "../Pages/Auth/Signup";
 // import AddMember from "../Pages/Auth/AddMember";
 
@@ -22,7 +19,7 @@ const AdminRoutes = () => {
     <Routes>
       <Route path="*" element={<Page404 />} />
       <Route path="/" element={<Login />} />
-      <Route path="signup" element={<Signup />} />
+      <Route path="/signup" element={<Signup />} />
       {/* <Route path="/create-account" element={<AddMember />}></Route> */}
 
 
@@ -49,13 +46,13 @@ const AdminRoutes = () => {
           </Route>
 
 
-        {/* User Routes */}
+        {/* User Routes
           <Route path="users" element={<Outlet />}>
             <Route index element={<GharUsers />} />
             <Route path="add-users" element={<AddGharUsers />} />
             <Route path="gharUser/:id" element={<GharUser />} />
             <Route path="edit-users/:id" element={<UpdateUser />} />
-          </Route>
+          </Route> */}
 
           
         </Route>
