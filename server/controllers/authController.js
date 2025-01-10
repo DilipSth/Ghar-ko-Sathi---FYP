@@ -4,35 +4,42 @@ import path from "path";
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 
-
+// Multer Configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/userCitizenship");
+    cb(null, "public/userCitizenship"); // Ensure this directory exists
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+    cb(null, Date.now() + path.extname(file.originalname)); // Add timestamp to filenames
   },
 });
 
 const uploadUser = multer({ storage });
 
+// Register Controller
 const register = async (req, res) => {
   try {
-    const { name, email, password, dob, gender, phoneNo, role = "user" } =
-      req.body;
+    const { name, email, password, dob, gender, phoneNo, role = "user" } = req.body;
 
-    const profileImage =
-      req.files?.profileImage?.[0]?.path || null;
-    const citizenshipImage =
-      req.files?.citizenshipImage?.[0]?.path || null;
+    // Validate inputs
+    if (!name || !email || !password || !dob || !gender || !phoneNo) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
 
+    // Image paths
+    const profileImage = req.files?.profileImage?.[0]?.filename || null;
+    const citizenshipImage = req.files?.citizenshipImage?.[0]?.filename || null;
+
+    // Check for existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "Email already exists" });
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Save user
     const newUser = new User({
       name,
       email,
@@ -48,7 +55,7 @@ const register = async (req, res) => {
     const savedUser = await newUser.save();
     res.status(201).json(savedUser);
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -82,12 +89,8 @@ const login = async (req, res) => {
   }
 };
 
-
-
 const verify = (req, res) => {
-  return res.status(200).json({ success: true, user: req.user });
+  res.status(200).json({ success: true, user: req.user });
 };
 
-export { login, register, verify, uploadUser };
-
-
+export { login, register, uploadUser, verify };

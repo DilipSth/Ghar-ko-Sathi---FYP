@@ -1,16 +1,10 @@
 import express from "express";
-import {
-  login,
-  register,
-  uploadUser,
-  verify,
-} from "../controllers/authController.js";
+import { login, register, uploadUser, verify } from "../controllers/authController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 router.post("/login", login);
-// Register Route with Two Image Uploads
 router.post(
   "/register",
   uploadUser.fields([

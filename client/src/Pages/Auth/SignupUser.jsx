@@ -1,8 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -14,14 +13,14 @@ const Signup = () => {
     gender: "",
     phoneNo: "",
     password: "",
-    role: "user", // Default role
+    role: "user",
     profileImage: null,
     citizenshipImage: null,
   });
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    if (name === "image") {
+    if (files) {
       setFormData((prev) => ({ ...prev, [name]: files[0] }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -37,22 +36,15 @@ const Signup = () => {
     }
 
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/auth/register",
-        data,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      const response = await axios.post("http://localhost:8000/api/auth/register", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       if (response.status === 201) {
         toast.success("Registration successful!");
         navigate("/");
       }
     } catch (error) {
-      console.error("Registration error:", error);
-      toast.error(
-        error.response?.data?.error || "An error occurred during registration."
-      );
+      toast.error(error.response?.data?.error || "An error occurred during registration.");
     }
   };
 
