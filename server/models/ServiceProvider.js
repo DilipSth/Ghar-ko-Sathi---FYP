@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema({
+const ServiceProviderSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true },
   password: { type: String, required: true },
@@ -9,16 +9,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ["admin", "serviceProvider", "user"],
     required: true,
-    default: "user",
+    default: "serviceProvider",
   },
   dob: { type: Date, required: true },
   gender: { type: String, required: true },
-  profileImage: { type: String },
-  citizenshipImage: { type: String },
-  createdAt: { type: Date, default: Date.now },
+  image: { type: String },
+  name: { type: String, required: true },
+
+
+  createAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 
-const User = mongoose.model("User", userSchema);
+const ServiceProvider = mongoose.model("ServiceProvider", ServiceProviderSchema);
 
-export default User;
+export default ServiceProvider;

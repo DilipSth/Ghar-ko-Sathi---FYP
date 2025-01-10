@@ -15,7 +15,8 @@ const Signup = () => {
     phoneNo: "",
     password: "",
     role: "user", // Default role
-    image: null,
+    profileImage: null,
+    citizenshipImage: null,
   });
 
   const handleChange = (e) => {
@@ -163,17 +164,31 @@ const Signup = () => {
             />
           </div>
 
-          {/* Image Upload Field */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Upload Image
+          {/* Profile Image */}
+          <div className="mb-4">
+            <label className="block mb-1 text-sm font-medium text-gray-700">
+              Profile Image
             </label>
             <input
               type="file"
-              name="image"
+              name="profileImage"
               onChange={handleChange}
               accept="image/*"
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border rounded-lg"
+            />
+          </div>
+
+          {/* Citizenship Image */}
+          <div className="mb-4">
+            <label className="block mb-1 text-sm font-medium text-gray-700">
+              Citizenship Image
+            </label>
+            <input
+              type="file"
+              name="citizenshipImage"
+              onChange={handleChange}
+              accept="image/*"
+              className="w-full px-4 py-2 border rounded-lg"
             />
           </div>
 

@@ -20,7 +20,11 @@ const register = async (req, res) => {
   try {
     const { name, email, password, dob, gender, phoneNo, role = "user" } =
       req.body;
-    const image = req.file ? path.join("uploads", req.file.filename) : null;
+
+    const profileImage =
+      req.files?.profileImage?.[0]?.path || null;
+    const citizenshipImage =
+      req.files?.citizenshipImage?.[0]?.path || null;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -28,6 +32,7 @@ const register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = new User({
       name,
       email,
@@ -36,7 +41,8 @@ const register = async (req, res) => {
       gender,
       phoneNo,
       role,
-      image,
+      profileImage,
+      citizenshipImage,
     });
 
     const savedUser = await newUser.save();

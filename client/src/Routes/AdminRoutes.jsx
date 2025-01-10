@@ -11,7 +11,7 @@ import RoleBaseRoutes from "../utils/RoleBaseRoutes";
 import AddServices from "../Pages/Menu/Services/AddServices";
 import Maps from "../Pages/Menu/Map/Maps";
 
-import Signup from "../Pages/Auth/Signup";
+import SignupUser from "../Pages/Auth/SignupUser";
 // import AddMember from "../Pages/Auth/AddMember";
 
 const AdminRoutes = () => {
@@ -19,7 +19,7 @@ const AdminRoutes = () => {
     <Routes>
       <Route path="*" element={<Page404 />} />
       <Route path="/" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+      <Route path="/signupUser" element={<SignupUser />} />
       {/* <Route path="/create-account" element={<AddMember />}></Route> */}
 
 
