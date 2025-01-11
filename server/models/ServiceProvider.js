@@ -9,15 +9,16 @@ const ServiceProviderSchema = new mongoose.Schema({
     type: String,
     enum: ["admin", "serviceProvider", "user"],
     required: true,
-    default: "serviceProvider",
+    default: "user",
   },
   dob: { type: Date, required: true },
   gender: { type: String, required: true },
-  image: { type: String },
-  name: { type: String, required: true },
-
-
-  createAt: { type: Date, default: Date.now },
+  services: { type: String, required: true },
+  question: { type: String, required: true },
+  profileImage: { type: String },
+  citizenshipImage: { type: String },
+  certificationImage: { type: String },
+  createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 

@@ -12,15 +12,17 @@ import AddServices from "../Pages/Menu/Services/AddServices";
 import Maps from "../Pages/Menu/Map/Maps";
 
 import SignupUser from "../Pages/Auth/SignupUser";
-// import AddMember from "../Pages/Auth/AddMember";
+import SignupDesign from "../Pages/Auth/SignupDesign";
+import SignupServiceProvider from "../Pages/Auth/SignupServiceProvider";
 
 const AdminRoutes = () => {
   return (
     <Routes>
       <Route path="*" element={<Page404 />} />
       <Route path="/" element={<Login />} />
+      <Route path="/signupAccount" element={<SignupDesign />}></Route>
       <Route path="/signupUser" element={<SignupUser />} />
-      {/* <Route path="/create-account" element={<AddMember />}></Route> */}
+      <Route path="/signupServiceProvider" element={<SignupServiceProvider />} />
 
 
       <Route path="/dashboard" element={<Layout />}>

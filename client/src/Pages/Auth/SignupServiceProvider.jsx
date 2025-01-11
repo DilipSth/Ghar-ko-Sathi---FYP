@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { NavLink, useNavigate } from "react-router-dom";
+import { fetchServices } from "../../utils/servicesHelper";
 
-const SignupUser = () => {
+const SignupServiceProvider = () => {
   const navigate = useNavigate();
+  const [services, setServices] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -13,10 +15,26 @@ const SignupUser = () => {
     gender: "",
     phoneNo: "",
     password: "",
+    services: "",
     role: "user",
     profileImage: null,
     citizenshipImage: null,
+    certificationImage: null,
+    question: "",
   });
+
+  useEffect(() => {
+    const getServices = async () => {
+      try {
+        const services = await fetchServices();
+        setServices(services || []); // Ensure services is always an array
+      } catch (error) {
+        console.error("Error fetching services:", error);
+      }
+    };
+
+    getServices();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -36,15 +54,21 @@ const SignupUser = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:8000/api/auth/registerUser", data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await axios.post(
+        "http://localhost:8000/api/auth/registerServiceProvider",
+        data,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
       if (response.status === 201) {
-        toast.success("User Registration successful!");
+        toast.success("Registration successful admin will notify you soon!");
         navigate("/");
       }
     } catch (error) {
-      toast.error(error.response?.data?.error || "An error occurred during registration.");
+      toast.error(
+        error.response?.data?.error || "An error occurred during registration."
+      );
     }
   };
 
@@ -54,14 +78,14 @@ const SignupUser = () => {
       <div className="absolute top-0 left-0 w-1/2 h-full bg-blue-300 opacity-30 rounded-full transform -translate-x-1/4"></div>
       <div className="absolute bottom-0 right-0 w-1/2 h-full bg-blue-300 opacity-30 rounded-full transform translate-x-1/4"></div>
 
-      {/* SignupUser Form Section */}
+      {/* SignupServiceProvider Form Section */}
       <div className="relative z-10 flex-1 flex justify-center items-center p-5">
         <form
           className="w-full max-w-lg p-8 bg-white border border-gray-300 rounded-lg shadow-lg transform transition-transform"
           onSubmit={handleSubmit}
         >
-          <h2 className="text-4xl font-bold text-center mb-6 text-blue-700">
-            Sign Up as User
+          <h2 className="text-3xl font-bold text-center mb-6 text-blue-700">
+            Sign Up as Service Provider
           </h2>
 
           {/* Name Field */}
@@ -184,6 +208,59 @@ const SignupUser = () => {
             />
           </div>
 
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Select Services
+            </label>
+            <select
+              name="services"
+              onChange={handleChange}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              multiple={false}
+            >
+              <option value="">Select Services</option>
+              {services.length > 0 ? (
+                services.map((ser) => (
+                  <option key={ser._id} value={ser._id}>
+                    {ser.ser_name}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>
+                  No services available
+                </option>
+              )}
+            </select>
+          </div>
+
+          {/* Certification Image */}
+          <div className="mb-4">
+            <label className="block mb-1 text-sm font-medium text-gray-700">
+              Certification Image
+            </label>
+            <input
+              type="file"
+              name="certificationImage"
+              onChange={handleChange}
+              accept="image/*"
+              className="w-full px-4 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Describe about the Service you provide....
+            </label>
+            <input
+              type="text"
+              name="question"
+              onChange={handleChange}
+              placeholder="Type Your Answer"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
@@ -218,4 +295,4 @@ const SignupUser = () => {
   );
 };
 
-export default SignupUser;
+export default SignupServiceProvider;

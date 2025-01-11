@@ -126,7 +126,7 @@ const Login = () => {
           {/* Sign Up Link */}
           <p className="mt-8 text-center text-sm">
             Don&apos;t have an account?{" "}
-            <NavLink to="/signupUser" className="text-blue-600 hover:underline">
+            <NavLink to="/signupAccount" className="text-blue-600 hover:underline">
               Sign Up
             </NavLink>
           </p>
