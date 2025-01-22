@@ -24,8 +24,11 @@ const Login = () => {
         localStorage.setItem("token", response.data.token);
         if (response.data.user.role === "admin") {
           navigate("/dashboard");
-        } else {
-          navigate("/serviceProvider-dashboard");
+        }if(response.data.user.role === "user"){
+          navigate("/dashboard/menu/services");
+        }
+        else {
+          navigate("/dashboard/menu/maps");
         }
       }
     } catch (error) {

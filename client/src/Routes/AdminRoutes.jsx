@@ -25,7 +25,10 @@ const AdminRoutes = () => {
       <Route path="/" element={<Login />} />
       <Route path="/signupAccount" element={<SignupDesign />} />
       <Route path="/signupUser" element={<SignupUser />} />
-      <Route path="/signupServiceProvider" element={<SignupServiceProvider />} />
+      <Route
+        path="/signupServiceProvider"
+        element={<SignupServiceProvider />}
+      />
 
       <Route
         path="/dashboard"
@@ -35,25 +38,23 @@ const AdminRoutes = () => {
           </PrivateRoutes>
         }
       >
-        <Route index element={<Dashboard />} />
-        
+
+        {/* Only Admin Can View the Dashboard */}
+        {user?.role === "admin" && <Route index element={<Dashboard />} />}
+
         <Route path="menu" element={<Outlet />}>
-
-
-
           {/* Map Routes */}
           <Route path="maps" element={<Maps />} />
-
-
 
           {/* Service Routes */}
           <Route path="services" element={<Outlet />}>
             <Route index element={<Services />} />
-            <Route path="add-services" element={<AddServices />} />
+            {user?.role === "admin" && (
+              <Route path="add-services" element={<AddServices />} />
+            )}
           </Route>
 
-
-          {/* Conditionally render User Routes */}
+          {/* Conditionally render User and ServiceProvider Routes */}
           {user?.role === "admin" && (
             <Route path="users" element={<Outlet />}>
               <Route index element={<Users />} />
@@ -61,8 +62,6 @@ const AdminRoutes = () => {
             </Route>
           )}
 
-
-          {/* Conditionally render User Routes */}
           {user?.role === "admin" && (
             <Route path="serviceProvider" element={<Outlet />}>
               <Route index element={<ServiceProviderUsers />} />
@@ -70,8 +69,6 @@ const AdminRoutes = () => {
             </Route>
           )}
         </Route>
-
-        
 
         <Route path="account" element={<Outlet />}>
           <Route path="settings" element={<Settings />} />
