@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth.js";
 import servicesRouter from "./routes/services.js";
-// import serviceProvidersRouter from "./routes/serviceProviders.js";
+import usersRouter from "./routes/users.js";
 import connectToDatabase from "./db/db.js";
 
 dotenv.config();
@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/services", servicesRouter);
-// app.use("/api/serviceProviders", serviceProvidersRouter);
+app.use("/api/users", usersRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

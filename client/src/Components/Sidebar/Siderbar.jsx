@@ -2,9 +2,11 @@ import { NavLink } from "react-router-dom";
 import { BiHome } from "react-icons/bi";
 import { AiOutlineClose } from "react-icons/ai";
 import { useState, useEffect } from "react";
+import { useAuth } from "../../context/authContext";
 import masterItems from "../../lib/Menu";
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
+  const { user } = useAuth(); // Access user from auth context
   const [activeRoute, setActiveRoute] = useState(() => {
     return localStorage.getItem("activeRoute") || "/dashboard";
   });
@@ -41,13 +43,18 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     );
   };
 
-  const menuItems = [
-    {
-      label: "Home",
-      icon: <BiHome className="text-xl" />,
-      to: "/dashboard",
-    },
-  ];
+  // Filter out "User's" section if the user is not an admin
+  const filteredMasterItems = masterItems.map((group) => {
+    if (group.label === "Menu") {
+      return {
+        ...group,
+        children: group.children.filter(
+          (item) => item.label !== "User's" || user?.role === "admin"
+        ),
+      };
+    }
+    return group;
+  });
 
   return (
     <div
@@ -88,8 +95,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           Home
         </NavLink>
 
-        {menuItems.slice(1).map((item) => renderNavItem(item))}
-        {masterItems.map((group) => (
+        {filteredMasterItems.map((group) => (
           <div key={group.label}>
             <h3 className="mb-4 ml-4 text-sm font-semibold flex items-center text-gray-300">
               {group.label}

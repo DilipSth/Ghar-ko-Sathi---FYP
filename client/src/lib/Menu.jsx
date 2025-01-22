@@ -23,6 +23,11 @@ const masterItems = [
         label: "User's",
         icon: <FaUsers className="text-xl" />,
       },
+      {
+        to: "/dashboard/menu/serviceProvider",
+        label: "Service Provider",
+        icon: <FaUsers className="text-xl" />,
+      },
     ],
   },
 

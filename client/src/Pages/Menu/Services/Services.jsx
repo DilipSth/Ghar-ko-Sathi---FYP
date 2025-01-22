@@ -1,9 +1,11 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { useAuth } from "../../../context/authContext";
 
 const Services = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Access user details from auth context
   const [services, setServices] = useState([]);
   const [serLoading, setSerLoading] = useState(false);
   const [filteredService, setFilteredService] = useState([]);
@@ -64,12 +66,15 @@ const Services = () => {
             onChange={handleFilter}
             className="border rounded-lg px-4 py-2 w-64"
           />
-          <button
-            className="ml-4 bg-blue-500 text-white px-4 py-2 rounded-lg"
-            onClick={handleCreateService}
-          >
-            Add Service
-          </button>
+          {/* Show Add Service button only for admin users */}
+          {user?.role === "admin" && (
+            <button
+              className="ml-4 bg-blue-500 text-white px-4 py-2 rounded-lg"
+              onClick={handleCreateService}
+            >
+              Add Service
+            </button>
+          )}
         </div>
         {/* Responsive grid layout */}
         {serLoading ? (

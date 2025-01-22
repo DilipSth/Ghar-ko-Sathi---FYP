@@ -160,4 +160,23 @@ const verify = (req, res) => {
   res.status(200).json({ success: true, user: req.user });
 };
 
-export { login, registerUser, registerServiceProvider, registerImage, verify };
+// const getUsers = async (req, res) => {
+//   try {
+//     const users = await User.find();
+//     return res.status(200).json({ success: true, users });
+//   } catch (error) {
+//     return res.status(500).json({ success: false, error: "Get Users Server Error" });
+//   }
+// };
+
+
+// const getServiceProvider = async (req, res) => {
+//   try {
+//     const serviceProviders = await ServiceProvider.find();
+//     return res.status(200).json({ success: true, serviceProviders });
+//   } catch (error) {
+//     return res.status(500).json({ success: false, error: "Get Service Providers Server Error" });
+//   }
+// };
+
+export { login, registerUser, registerServiceProvider, registerImage, verify};

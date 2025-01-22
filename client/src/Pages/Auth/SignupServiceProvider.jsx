@@ -16,7 +16,7 @@ const SignupServiceProvider = () => {
     phoneNo: "",
     password: "",
     services: "",
-    role: "user",
+    role: "serviceProvider",
     profileImage: null,
     citizenshipImage: null,
     certificationImage: null,

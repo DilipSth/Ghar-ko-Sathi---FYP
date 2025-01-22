@@ -9,7 +9,7 @@ const ServiceProviderSchema = new mongoose.Schema({
     type: String,
     enum: ["admin", "serviceProvider", "user"],
     required: true,
-    default: "user",
+    default: "serviceProvider",
   },
   dob: { type: Date, required: true },
   gender: { type: String, required: true },

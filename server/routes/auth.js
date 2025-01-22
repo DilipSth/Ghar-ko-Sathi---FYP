@@ -25,6 +25,7 @@ router.post(
   registerServiceProvider
 );
 
+
 router.get("/verify", authMiddleware, verify);
 
 export default router;
