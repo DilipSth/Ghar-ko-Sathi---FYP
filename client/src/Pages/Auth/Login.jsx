@@ -24,16 +24,15 @@ const Login = () => {
         localStorage.setItem("token", response.data.token);
         if (response.data.user.role === "admin") {
           navigate("/dashboard");
-        }if(response.data.user.role === "user"){
+        } else if (response.data.user.role === "user") {
           navigate("/dashboard/menu/services");
-        }
-        else {
-          navigate("/dashboard/menu/maps");
+        } else if (response.data.user.role === "serviceProvider") {
+          navigate("/dashboard/menu/maps"); // Adjust the route as needed
         }
       }
     } catch (error) {
       if (error.response && !error.response.data.success) {
-        setError(error.response.data.success);
+        setError(error.response.data.error || "Login failed");
       } else {
         setError("Server Error");
       }

@@ -129,54 +129,49 @@ const registerServiceProvider = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+
+    // Check in User model
+    let user = await User.findOne({ email });
+    let userType = 'user';
+
+    // If not found in User model, check in ServiceProvider model
     if (!user) {
-      res.status(404).json({ success: false, error: "User not Found" });
+      user = await ServiceProvider.findOne({ email });
+      userType = 'serviceProvider';
     }
 
+    // If user is not found in either model
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      res.status(404).json({ success: false, error: "Wrong Password" });
+      return res.status(401).json({ success: false, error: "Wrong password" });
     }
 
+    // Generate token
     const token = jwt.sign(
       { _id: user._id, role: user.role },
       process.env.JWT_KEY,
       { expiresIn: "10d" }
     );
-    // console.log("hello world",token);
+
+    // Return success response
     res.status(200).json({
       success: true,
       token,
       user: { _id: user._id, name: user.name, role: user.role },
     });
   } catch (error) {
-    // console.log("yeta tira login authcontroooler");
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
+
 const verify = (req, res) => {
   res.status(200).json({ success: true, user: req.user });
 };
-
-// const getUsers = async (req, res) => {
-//   try {
-//     const users = await User.find();
-//     return res.status(200).json({ success: true, users });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, error: "Get Users Server Error" });
-//   }
-// };
-
-
-// const getServiceProvider = async (req, res) => {
-//   try {
-//     const serviceProviders = await ServiceProvider.find();
-//     return res.status(200).json({ success: true, serviceProviders });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, error: "Get Service Providers Server Error" });
-//   }
-// };
 
 export { login, registerUser, registerServiceProvider, registerImage, verify};
