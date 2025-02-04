@@ -1,5 +1,5 @@
 import express from "express";
-import { login, registerUser,registerServiceProvider, registerImage, verify } from "../controllers/authController.js";
+import { login, registerUser, registerServiceProvider, registerImage, verify } from "../controllers/authController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -24,7 +24,6 @@ router.post(
   ]),
   registerServiceProvider
 );
-
 
 router.get("/verify", authMiddleware, verify);
 

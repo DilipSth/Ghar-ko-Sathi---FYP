@@ -170,8 +170,16 @@ const login = async (req, res) => {
 };
 
 
-const verify = (req, res) => {
-  res.status(200).json({ success: true, user: req.user });
+const verify = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User Not Found" });
+    }
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 };
 
 export { login, registerUser, registerServiceProvider, registerImage, verify};
