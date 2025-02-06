@@ -2,6 +2,7 @@ import express from "express";
 import {
   getUsers,
   getUserById,
+  getCurrentUser,
   updateUser,
   deleteUser,
   getServiceProvider,
@@ -13,6 +14,7 @@ import {
 const router = express.Router();
 
 router.get("/gharUsers", getUsers);
+router.get("/currentUser", getCurrentUser);
 router.get("/gharUsers/:id", getUserById);
 router.put("/gharUsers/:id", updateUser);
 router.delete("/gharUsers/:id", deleteUser);

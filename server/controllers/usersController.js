@@ -12,6 +12,27 @@ const getUsers = async (req, res) => {
   }
 };
 
+// Add this to your usersController.js
+const getCurrentUser = async (req, res) => {
+  try {
+    const userId = req.user.id; // Assuming you have middleware that attaches the user to the request
+    const user = await User.findById(userId);
+    const provider = await ServiceProvider.findById(userId);
+
+    if (user) {
+      return res.status(200).json({ success: true, user });
+    } else if (provider) {
+      return res.status(200).json({ success: true, user: provider });
+    } else {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+  } catch (error) {
+    console.error("Error fetching current user:", error);
+    return res.status(500).json({ success: false, error: "Server Error" });
+  }
+};
+
+
 // Get a user by ID
 const getUserById = async (req, res) => {
   try {
@@ -125,6 +146,7 @@ const deleteServiceProvider = async (req, res) => {
 };
 export {
   getUsers,
+  getCurrentUser,
   getUserById,
   updateUser,
   deleteUser,
