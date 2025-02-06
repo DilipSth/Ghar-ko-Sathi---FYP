@@ -11,10 +11,6 @@ const ServiceProviderUsers = () => {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedType, setSelectedType] = useState("");
 
-  const handleCreateUser = () => {
-    navigate("/dashboard/menu/users/add-users");
-  };
-
   const fetchServiceProviders = async () => {
     setLoading(true);
     try {
@@ -92,12 +88,6 @@ const ServiceProviderUsers = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Service Provider Users</h1>
-          <button
-            className="bg-[#3C50E0] text-white px-4 py-2 rounded"
-            onClick={handleCreateUser}
-          >
-            Add New
-          </button>
         </div>
 
         {/* Filters */}
@@ -180,10 +170,12 @@ const ServiceProviderUsers = () => {
                       {provider.status}
                     </span>
                   </td>
-                  <td className="p-4 flex">
+                  <td>
                     <button
                       onClick={() =>
-                        navigate(`/dashboard/menu/serviceProvider/view/${provider._id}`)
+                        navigate(
+                          `/dashboard/menu/serviceProvider/view/${provider._id}`
+                        )
                       }
                       className="mr-2 rounded-md border border-[#2e4f31] text-[#2e4f31] py-1 px-3 text-center font-medium hover:bg-[#2e4f31] hover:text-white duration-200"
                     >
@@ -192,8 +184,9 @@ const ServiceProviderUsers = () => {
 
                     <button
                       onClick={() =>
-                        navigate(`/dashboard/menu/serviceProvider/edit/${provider._id}`)
-
+                        navigate(
+                          `/dashboard/menu/serviceProvider/edit/${provider._id}`
+                        )
                       }
                       className="mr-2 rounded-md border border-[#3C50E0] text-[#3C50E0] py-1 px-3 text-center font-medium hover:bg-[#3C50E0] hover:text-white duration-200"
                     >

@@ -67,12 +67,6 @@ const Users = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Ghar Users</h1>
-          <button
-            className="bg-[#3C50E0] text-white px-4 py-2 rounded"
-            onClick={handleCreateUser}
-          >
-            Add New
-          </button>
         </div>
 
         {/* Filters */}
@@ -155,7 +149,7 @@ const Users = () => {
                       {user.status}
                     </span>
                   </td>
-                  <td className="p-4 flex">
+                  <td>
                     <button
                       onClick={() =>
                         navigate(`/dashboard/menu/users/gharUser/${user._id}`)
