@@ -15,6 +15,8 @@ import GharUser from "../Pages/Users/GharUser";
 import { useAuth } from "../context/authContext";
 import Users from "../Pages/Users/Users";
 import ServiceProviderUsers from "../Pages/Users/ServiceProviderUsers";
+import ViewServiceProvider from "../Pages/Users/ViewServiceProvider";
+import EditServiceProvider from "../Pages/Users/EditServiceProvider";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -64,9 +66,10 @@ const AdminRoutes = () => {
 
           {user?.role === "admin" && (
             <Route path="serviceProvider" element={<Outlet />}>
-              <Route index element={<ServiceProviderUsers />} />
-              <Route path="gharUser/:id" element={<GharUser />} />
-            </Route>
+            <Route index element={<ServiceProviderUsers />} />
+            <Route path="view/:id" element={<ViewServiceProvider />} />
+            <Route path="edit/:id" element={<EditServiceProvider />} />
+          </Route>
           )}
         </Route>
 

@@ -15,12 +15,50 @@ const ServiceProviderUsers = () => {
     navigate("/dashboard/menu/users/add-users");
   };
 
+  const fetchServiceProviders = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        "http://localhost:8000/api/users/serviceProvider",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (response.data.success) {
+        const data = response.data.serviceProviders.map((provider) => ({
+          _id: provider._id,
+          name: provider.name,
+          mobile: provider.phoneNo || "N/A",
+          email: provider.email || "N/A",
+          type: provider.role || "Service Provider",
+          status: "Active", // Assuming all users are active
+          profileImage: provider.profileImage
+            ? `http://localhost:8000/public/registerImage/${provider.profileImage}`
+            : null,
+        }));
+        setServiceProviders(data);
+      }
+    } catch (error) {
+      alert(
+        error.response?.data?.error ||
+          "Error occurred while fetching service providers."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchServiceProviders = async () => {
-      setLoading(true);
+    fetchServiceProviders();
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
       try {
-        const response = await axios.get(
-          "http://localhost:8000/api/users/serviceProvider",
+        const response = await axios.delete(
+          `http://localhost:8000/api/users/serviceProvider/${id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -28,31 +66,17 @@ const ServiceProviderUsers = () => {
           }
         );
         if (response.data.success) {
-          const data = response.data.serviceProviders.map((provider) => ({
-            _id: provider._id,
-            name: provider.name,
-            mobile: provider.phoneNo || "N/A",
-            email: provider.email || "N/A",
-            type: provider.role || "Service Provider",
-            status: "Active", // Assuming all users are active
-            profileImage: provider.profileImage
-              ? `http://localhost:8000/public/registerImage/${provider.profileImage}`
-              : null,
-          }));
-          setServiceProviders(data);
+          alert("User deleted successfully!");
+          fetchServiceProviders(); // Refresh the list
         }
       } catch (error) {
         alert(
           error.response?.data?.error ||
-            "Error occurred while fetching service providers."
+            "Error occurred while deleting the user."
         );
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchServiceProviders();
-  }, []);
+    }
+  };
 
   const filteredServiceProviders = serviceProviders.filter((provider) => {
     const matchesStatus = selectedStatus
@@ -159,9 +183,7 @@ const ServiceProviderUsers = () => {
                   <td className="p-4 flex">
                     <button
                       onClick={() =>
-                        navigate(
-                          `/dashboard/menu/users/serviceProvider/${provider._id}`
-                        )
+                        navigate(`/dashboard/menu/serviceProvider/view/${provider._id}`)
                       }
                       className="mr-2 rounded-md border border-[#2e4f31] text-[#2e4f31] py-1 px-3 text-center font-medium hover:bg-[#2e4f31] hover:text-white duration-200"
                     >
@@ -170,15 +192,15 @@ const ServiceProviderUsers = () => {
 
                     <button
                       onClick={() =>
-                        navigate(
-                          `/dashboard/menu/users/edit-service-provider/${provider._id}`
-                        )
+                        navigate(`/dashboard/menu/serviceProvider/edit/${provider._id}`)
+
                       }
                       className="mr-2 rounded-md border border-[#3C50E0] text-[#3C50E0] py-1 px-3 text-center font-medium hover:bg-[#3C50E0] hover:text-white duration-200"
                     >
                       <FaEdit />
                     </button>
                     <button
+                      onClick={() => handleDelete(provider._id)}
                       className="mr-2 rounded-md border border-[#c13d3d] text-[#c13d3d] py-1 px-3 text-center font-medium hover:bg-[#c13d3d] hover:text-white duration-200"
                     >
                       <MdDeleteForever />
