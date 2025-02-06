@@ -1,3 +1,5 @@
+// Users.js
+
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { FaEdit, FaEye } from "react-icons/fa";
@@ -6,21 +8,54 @@ import { useNavigate } from "react-router";
 
 const Users = () => {
   const navigate = useNavigate();
-  const [Users, setUsers] = useState([]);
-  const [gharUserLoading, setGharUserLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedType, setSelectedType] = useState("");
 
-  const handleCreateUser = () => {
-    navigate("/dashboard/menu/users/add-users");
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        "http://localhost:8000/api/users/gharUsers",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (response.data.success) {
+        const data = response.data.users.map((user) => ({
+          _id: user._id,
+          name: user.name,
+          mobile: user.phoneNo || "N/A",
+          email: user.email || "N/A",
+          type: user.role || "User",
+          status: "Active", // Assuming all users are active
+          profileImage: user.profileImage
+            ? `http://localhost:8000/public/registerImage/${user.profileImage}`
+            : null,
+        }));
+        setUsers(data);
+      }
+    } catch (error) {
+      alert(
+        error.response?.data?.error || "Error occurred while fetching users."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      setGharUserLoading(true);
+    fetchUsers();
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
       try {
-        const response = await axios.get(
-          "http://localhost:8000/api/users/gharUsers",
+        const response = await axios.delete(
+          `http://localhost:8000/api/users/gharUsers/${id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -28,32 +63,19 @@ const Users = () => {
           }
         );
         if (response.data.success) {
-          const data = response.data.users.map((user) => ({
-            _id: user._id,
-            name: user.name,
-            mobile: user.phoneNo || "N/A",
-            email: user.email || "N/A",
-            type: user.role || "User",
-            status: "Active", // Assuming status is not provided in API
-            profileImage: user.profileImage
-              ? `http://localhost:8000/public/registerImage/${user.profileImage}`
-              : null,
-          }));
-          setUsers(data);
+          alert("User deleted successfully!");
+          fetchUsers(); // Refresh the list
         }
       } catch (error) {
         alert(
-          error.response?.data?.error || "Error occurred while fetching users."
+          error.response?.data?.error ||
+            "Error occurred while deleting the user."
         );
-      } finally {
-        setGharUserLoading(false);
       }
-    };
+    }
+  };
 
-    fetchUsers();
-  }, []);
-
-  const filteredUsers = Users.filter((user) => {
+  const filteredUsers = users.filter((user) => {
     const matchesStatus = selectedStatus
       ? user.status === selectedStatus
       : true;
@@ -66,7 +88,7 @@ const Users = () => {
       <div className="bg-white p-4 rounded-lg shadow-md h-full flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Ghar Users</h1>
+          <h1 className="text-2xl font-bold">Users</h1>
         </div>
 
         {/* Filters */}
@@ -105,7 +127,7 @@ const Users = () => {
         </div>
 
         {/* Users Table */}
-        {gharUserLoading ? (
+        {loading ? (
           <p>Loading...</p>
         ) : filteredUsers.length > 0 ? (
           <table className="w-full bg-white rounded-lg shadow mt-6">
@@ -152,7 +174,7 @@ const Users = () => {
                   <td>
                     <button
                       onClick={() =>
-                        navigate(`/dashboard/menu/users/gharUser/${user._id}`)
+                        navigate(`/dashboard/menu/users/view/${user._id}`)
                       }
                       className="mr-2 rounded-md border border-[#2e4f31] text-[#2e4f31] py-1 px-3 text-center font-medium hover:bg-[#2e4f31] hover:text-white duration-200"
                     >
@@ -161,13 +183,14 @@ const Users = () => {
 
                     <button
                       onClick={() =>
-                        navigate(`/dashboard/menu/users/edit-users/${user._id}`)
+                        navigate(`/dashboard/menu/users/edit/${user._id}`)
                       }
                       className="mr-2 rounded-md border border-[#3C50E0] text-[#3C50E0] py-1 px-3 text-center font-medium hover:bg-[#3C50E0] hover:text-white duration-200"
                     >
                       <FaEdit />
                     </button>
                     <button
+                      onClick={() => handleDelete(user._id)}
                       className="mr-2 rounded-md border border-[#c13d3d] text-[#c13d3d] py-1 px-3 text-center font-medium hover:bg-[#c13d3d] hover:text-white duration-200"
                     >
                       <MdDeleteForever />

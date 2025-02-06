@@ -11,12 +11,13 @@ import Maps from "../Pages/Menu/Map/Maps";
 import SignupUser from "../Pages/Auth/SignupUser";
 import SignupDesign from "../Pages/Auth/SignupDesign";
 import SignupServiceProvider from "../Pages/Auth/SignupServiceProvider";
-import GharUser from "../Pages/Users/GharUser";
 import { useAuth } from "../context/authContext";
-import Users from "../Pages/Users/Users";
-import ServiceProviderUsers from "../Pages/Users/ServiceProviderUsers";
-import ViewServiceProvider from "../Pages/Users/ViewServiceProvider";
-import EditServiceProvider from "../Pages/Users/EditServiceProvider";
+import Users from "../Pages/Users/Users/Users";
+import ServiceProviderUsers from "../Pages/Users/ServiceProvider/ServiceProviderUsers";
+import ViewServiceProvider from "../Pages/Users/ServiceProvider/ViewServiceProvider";
+import EditServiceProvider from "../Pages/Users/ServiceProvider/EditServiceProvider";
+import ViewUser from "../Pages/Users/Users/ViewUser";
+import EditUser from "../Pages/Users/Users/EditUser";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -40,7 +41,6 @@ const AdminRoutes = () => {
           </PrivateRoutes>
         }
       >
-
         {/* Only Admin Can View the Dashboard */}
         {user?.role === "admin" && <Route index element={<Dashboard />} />}
 
@@ -60,16 +60,17 @@ const AdminRoutes = () => {
           {user?.role === "admin" && (
             <Route path="users" element={<Outlet />}>
               <Route index element={<Users />} />
-              <Route path="gharUser/:id" element={<GharUser />} />
+              <Route path="view/:id" element={<ViewUser />} />
+              <Route path="edit/:id" element={<EditUser />} />
             </Route>
           )}
 
           {user?.role === "admin" && (
             <Route path="serviceProvider" element={<Outlet />}>
-            <Route index element={<ServiceProviderUsers />} />
-            <Route path="view/:id" element={<ViewServiceProvider />} />
-            <Route path="edit/:id" element={<EditServiceProvider />} />
-          </Route>
+              <Route index element={<ServiceProviderUsers />} />
+              <Route path="view/:id" element={<ViewServiceProvider />} />
+              <Route path="edit/:id" element={<EditServiceProvider />} />
+            </Route>
           )}
         </Route>
 
