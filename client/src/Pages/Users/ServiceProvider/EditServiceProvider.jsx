@@ -10,6 +10,7 @@ const EditServiceProvider = () => {
     name: "",
     email: "",
     phoneNo: "",
+    dob: "",
     role: "serviceProvider",
     gender: "",
     services: "",
@@ -96,6 +97,18 @@ const EditServiceProvider = () => {
               setProvider({ ...provider, phoneNo: e.target.value })
             }
             className="w-full p-2 border rounded"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+          <input
+            type="date"
+            name="dob"
+            value={provider.dob ? new Date(provider.dob).toISOString().split('T')[0] : ''}
+            onChange={(e) =>
+              setProvider({ ...provider, dob: e.target.value })
+            }
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2"
           />
         </div>
         <div>
