@@ -7,7 +7,6 @@ import Settings from "../Pages/Account/Settings/Settings";
 import Login from "../Pages/Auth/Login";
 import PrivateRoutes from "../utils/PrivateRoutes";
 import AddServices from "../Pages/Menu/Services/AddServices";
-import Maps from "../Pages/Menu/Map/Maps";
 import SignupUser from "../Pages/Auth/SignupUser";
 import SignupDesign from "../Pages/Auth/SignupDesign";
 import SignupServiceProvider from "../Pages/Auth/SignupServiceProvider";
@@ -18,6 +17,7 @@ import ViewServiceProvider from "../Pages/Users/ServiceProvider/ViewServiceProvi
 import EditServiceProvider from "../Pages/Users/ServiceProvider/EditServiceProvider";
 import ViewUser from "../Pages/Users/Users/ViewUser";
 import EditUser from "../Pages/Users/Users/EditUser";
+import ServiceProviderMap from "../Pages/Menu/Map/ServiceProviderMaps";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -46,7 +46,9 @@ const AdminRoutes = () => {
 
         <Route path="menu" element={<Outlet />}>
           {/* Map Routes */}
-          <Route path="maps" element={<Maps />} />
+          {/* <Route path="maps" element={<Maps />} /> */}
+          <Route path="maps" element={<ServiceProviderMap />} />
+
 
           {/* Service Routes */}
           <Route path="services" element={<Outlet />}>
