@@ -1,4 +1,4 @@
-import { Routes, Route, Outlet } from "react-router-dom";
+import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 import Page404 from "../Pages/Page404/Page404";
 import Layout from "../Components/Layout";
 import Dashboard from "../Pages/Dashboard/Dashboard";
@@ -6,6 +6,7 @@ import Services from "../Pages/Menu/Services/Services";
 import Settings from "../Pages/Account/Settings/Settings";
 import Login from "../Pages/Auth/Login";
 import PrivateRoutes from "../utils/PrivateRoutes";
+import RoleBaseRoutes from "../utils/RoleBaseRoutes";
 import AddServices from "../Pages/Menu/Services/AddServices";
 import SignupUser from "../Pages/Auth/SignupUser";
 import SignupDesign from "../Pages/Auth/SignupDesign";
@@ -18,21 +19,28 @@ import EditServiceProvider from "../Pages/Users/ServiceProvider/EditServiceProvi
 import ViewUser from "../Pages/Users/Users/ViewUser";
 import EditUser from "../Pages/Users/Users/EditUser";
 import ServiceProviderMap from "../Pages/Menu/Map/ServiceProviderMaps";
+import PendingApproval from "../Pages/PendingApproval";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
 
   return (
     <Routes>
-      <Route path="*" element={<Page404 />} />
+      {/* Public Routes */}
       <Route path="/" element={<Login />} />
       <Route path="/signupAccount" element={<SignupDesign />} />
       <Route path="/signupUser" element={<SignupUser />} />
-      <Route
-        path="/signupServiceProvider"
-        element={<SignupServiceProvider />}
+      <Route path="/signupServiceProvider" element={<SignupServiceProvider />} />
+      <Route 
+        path="/pending-approval" 
+        element={
+          <PrivateRoutes>
+            <PendingApproval />
+          </PrivateRoutes>
+        } 
       />
 
+      {/* Dashboard and Protected Routes */}
       <Route
         path="/dashboard"
         element={
@@ -41,45 +49,102 @@ const AdminRoutes = () => {
           </PrivateRoutes>
         }
       >
-        {/* Only Admin Can View the Dashboard */}
-        {user?.role === "admin" && <Route index element={<Dashboard />} />}
+        {/* Dashboard Index Route - role-based access */}
+        <Route 
+          index 
+          element={
+            user?.role === "admin" ? (
+              <Dashboard />
+            ) : user?.role === "user" ? (
+              <Navigate to="/dashboard/menu/services" replace />
+            ) : user?.role === "serviceProvider" ? (
+              <Navigate to="/dashboard/menu/maps" replace />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
 
         <Route path="menu" element={<Outlet />}>
-          {/* Map Routes */}
-          {/* <Route path="maps" element={<Maps />} /> */}
-          <Route path="maps" element={<ServiceProviderMap />} />
+          {/* Maps Route */}
+          <Route 
+            path="maps" 
+            element={
+              user?.role === "serviceProvider" ? (
+                <RoleBaseRoutes requiredRole={["serviceProvider", "admin"]} requireApproval={true}>
+                  <ServiceProviderMap />
+                </RoleBaseRoutes>
+              ) : (
+                <RoleBaseRoutes requiredRole={["admin"]}>
+                  <ServiceProviderMap />
+                </RoleBaseRoutes>
+              )
+            } 
+          />
 
-
-          {/* Service Routes */}
+          {/* Services Routes */}
           <Route path="services" element={<Outlet />}>
-            <Route index element={<Services />} />
-            {user?.role === "admin" && (
-              <Route path="add-services" element={<AddServices />} />
-            )}
+            <Route 
+              index 
+              element={
+                user?.role === "serviceProvider" ? (
+                  <RoleBaseRoutes requiredRole={["serviceProvider", "admin"]} requireApproval={true}>
+                    <Services />
+                  </RoleBaseRoutes>
+                ) : (
+                  <RoleBaseRoutes requiredRole={["user", "admin"]}>
+                    <Services />
+                  </RoleBaseRoutes>
+                )
+              } 
+            />
+            <Route 
+              path="add-services" 
+              element={
+                <RoleBaseRoutes requiredRole={["admin"]}>
+                  <AddServices />
+                </RoleBaseRoutes>
+              } 
+            />
           </Route>
 
-          {/* Conditionally render User and ServiceProvider Routes */}
-          {user?.role === "admin" && (
-            <Route path="users" element={<Outlet />}>
-              <Route index element={<Users />} />
-              <Route path="view/:id" element={<ViewUser />} />
-              <Route path="edit/:id" element={<EditUser />} />
-            </Route>
-          )}
+          {/* User Management Routes - Admin Only */}
+          <Route 
+            path="users" 
+            element={
+              <RoleBaseRoutes requiredRole={["admin"]}>
+                <Outlet />
+              </RoleBaseRoutes>
+            }
+          >
+            <Route index element={<Users />} />
+            <Route path="view/:id" element={<ViewUser />} />
+            <Route path="edit/:id" element={<EditUser />} />
+          </Route>
 
-          {user?.role === "admin" && (
-            <Route path="serviceProvider" element={<Outlet />}>
-              <Route index element={<ServiceProviderUsers />} />
-              <Route path="view/:id" element={<ViewServiceProvider />} />
-              <Route path="edit/:id" element={<EditServiceProvider />} />
-            </Route>
-          )}
+          {/* Service Provider Management Routes - Admin Only */}
+          <Route 
+            path="serviceProvider" 
+            element={
+              <RoleBaseRoutes requiredRole={["admin"]}>
+                <Outlet />
+              </RoleBaseRoutes>
+            }
+          >
+            <Route index element={<ServiceProviderUsers />} />
+            <Route path="view/:id" element={<ViewServiceProvider />} />
+            <Route path="edit/:id" element={<EditServiceProvider />} />
+          </Route>
         </Route>
 
+        {/* Account Settings Route - Available to all authenticated users */}
         <Route path="account" element={<Outlet />}>
           <Route path="settings" element={<Settings />} />
         </Route>
       </Route>
+
+      {/* Catch-all for undefined routes */}
+      <Route path="*" element={<Page404 />} />
     </Routes>
   );
 };

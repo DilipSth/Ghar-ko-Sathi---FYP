@@ -138,6 +138,23 @@ const login = async (req, res) => {
     if (!user) {
       user = await ServiceProvider.findOne({ email });
       userType = 'serviceProvider';
+      
+      // Check if service provider is approved
+      if (user && user.role === 'serviceProvider' && !user.approved) {
+        // We still allow login, but return the approved status so frontend can redirect accordingly
+        const token = jwt.sign(
+          { _id: user._id, role: user.role },
+          process.env.JWT_KEY,
+          { expiresIn: "10d" }
+        );
+        
+        return res.status(200).json({
+          success: true,
+          token,
+          user: { _id: user._id, name: user.name, role: user.role, approved: false },
+          message: "Your account is pending approval from an administrator."
+        });
+      }
     }
 
     // If user is not found in either model
@@ -158,17 +175,28 @@ const login = async (req, res) => {
       { expiresIn: "10d" }
     );
 
+    // Include approved status for service providers
+    const userData = { 
+      _id: user._id, 
+      name: user.name, 
+      role: user.role 
+    };
+    
+    // Add approved status only for service providers
+    if (userType === 'serviceProvider') {
+      userData.approved = user.approved;
+    }
+
     // Return success response
     res.status(200).json({
       success: true,
       token,
-      user: { _id: user._id, name: user.name, role: user.role },
+      user: userData
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
-
 
 const verify = async (req, res) => {
   try {

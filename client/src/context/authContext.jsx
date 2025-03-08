@@ -50,8 +50,8 @@ const AuthContext = ({ children }) => {
   }, []);
 
   // Login function
-  const login = (user) => {
-    setUser(user);
+  const login = (userData) => {
+    setUser(userData);
     setLoading(false);
   };
 
@@ -61,8 +61,13 @@ const AuthContext = ({ children }) => {
     localStorage.removeItem("token");
   };
 
+  // Check if the user is a service provider and not approved
+  const isPendingApproval = () => {
+    return user && user.role === "serviceProvider" && user.approved === false;
+  };
+
   return (
-    <userContext.Provider value={{ user, login, logout, loading }}>
+    <userContext.Provider value={{ user, login, logout, loading, isPendingApproval }}>
       {children}
     </userContext.Provider>
   );

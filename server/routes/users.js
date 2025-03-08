@@ -8,6 +8,7 @@ import {
   getServiceProvider,
   getServiceProviderById,
   updateServiceProvider,
+  approveServiceProvider,
   deleteServiceProvider,
 } from "../controllers/usersController.js";
 
@@ -21,6 +22,7 @@ router.delete("/gharUsers/:id", deleteUser);
 router.get("/serviceProvider", getServiceProvider);
 router.get("/serviceProvider/:id", getServiceProviderById);
 router.put("/serviceProvider/:id", updateServiceProvider);
+router.put("/serviceProvider/approve/:id", approveServiceProvider);
 router.delete("/serviceProvider/:id", deleteServiceProvider);
 
 export default router;

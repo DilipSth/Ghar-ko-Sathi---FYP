@@ -32,7 +32,6 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
-
 // Get a user by ID
 const getUserById = async (req, res) => {
   try {
@@ -129,6 +128,36 @@ const updateServiceProvider = async (req, res) => {
   }
 };
 
+// Approve or reject a service provider
+const approveServiceProvider = async (req, res) => {
+  try {
+    const { approved } = req.body;
+    
+    if (typeof approved !== 'boolean') {
+      return res.status(400).json({ success: false, error: "Approved status must be a boolean" });
+    }
+    
+    const provider = await ServiceProvider.findByIdAndUpdate(
+      req.params.id,
+      { approved },
+      { new: true }
+    );
+    
+    if (!provider) {
+      return res.status(404).json({ success: false, error: "Provider not found" });
+    }
+    
+    return res.status(200).json({ 
+      success: true, 
+      provider,
+      message: approved ? "Provider approved successfully" : "Provider approval revoked" 
+    });
+  } catch (error) {
+    console.error("Error approving/rejecting service provider:", error);
+    return res.status(500).json({ success: false, error: "Server Error" });
+  }
+};
+
 // Delete a service provider
 const deleteServiceProvider = async (req, res) => {
   try {
@@ -144,6 +173,7 @@ const deleteServiceProvider = async (req, res) => {
     return res.status(500).json({ success: false, error: "Server Error" });
   }
 };
+
 export {
   getUsers,
   getCurrentUser,
@@ -153,5 +183,6 @@ export {
   getServiceProvider,
   getServiceProviderById,
   updateServiceProvider,
+  approveServiceProvider,
   deleteServiceProvider,
 };

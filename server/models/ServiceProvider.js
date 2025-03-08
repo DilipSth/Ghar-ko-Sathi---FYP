@@ -1,3 +1,4 @@
+// ServiceProvider.js
 import mongoose from "mongoose";
 
 const ServiceProviderSchema = new mongoose.Schema({
@@ -11,6 +12,7 @@ const ServiceProviderSchema = new mongoose.Schema({
     required: true,
     default: "serviceProvider",
   },
+  approved: { type: Boolean, default: false }, // Add this field
   dob: { type: Date, required: true },
   gender: { type: String, required: true },
   services: { type: String, required: true },

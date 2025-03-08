@@ -19,6 +19,9 @@ const verifyUser = async (req, res, next) => {
       if (!user) {
         return res.status(404).json({ success: false, error: "User Not Found" });
       }
+      
+      // Ensure the approved status is included in the user object
+      // No need to modify it, as it's already included in the ServiceProvider model
     }
 
     req.user = user;
