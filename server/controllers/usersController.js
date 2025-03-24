@@ -12,20 +12,16 @@ const getUsers = async (req, res) => {
   }
 };
 
-// Add this to your usersController.js
+// Get the current logged-in user
 const getCurrentUser = async (req, res) => {
   try {
-    const userId = req.user.id; // Assuming you have middleware that attaches the user to the request
-    const user = await User.findById(userId);
-    const provider = await ServiceProvider.findById(userId);
-
-    if (user) {
-      return res.status(200).json({ success: true, user });
-    } else if (provider) {
-      return res.status(200).json({ success: true, user: provider });
-    } else {
+    // Ensure req.user is populated by the middleware
+    if (!req.user) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
+
+    // Return the user data
+    return res.status(200).json({ success: true, user: req.user });
   } catch (error) {
     console.error("Error fetching current user:", error);
     return res.status(500).json({ success: false, error: "Server Error" });
@@ -42,25 +38,6 @@ const getUserById = async (req, res) => {
     return res.status(200).json({ success: true, user });
   } catch (error) {
     console.error("Error fetching user by ID:", error);
-    return res.status(500).json({ success: false, error: "Server Error" });
-  }
-};
-
-// Update a user
-const updateUser = async (req, res) => {
-  try {
-    const { name, email, phoneNo, role, dob, gender, profileImage, citizenshipImage } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, email, phoneNo, role, dob, gender, profileImage, citizenshipImage },
-      { new: true }
-    );
-    if (!user) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-    return res.status(200).json({ success: true, user });
-  } catch (error) {
-    console.error("Error updating user:", error);
     return res.status(500).json({ success: false, error: "Server Error" });
   }
 };
@@ -106,20 +83,36 @@ const getServiceProviderById = async (req, res) => {
   }
 };
 
+// Update a user
+const updateUser = async (req, res) => {
+  try {
+    const { name, email, phoneNo, role, dob, gender, password } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, email, phoneNo, role, dob },
+      { new: true }
+    );
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+    return res.status(200).json({ success: true, user });
+  } catch (error) {
+    console.error("Error updating user:", error);
+    return res.status(500).json({ success: false, error: "Server Error" });
+  }
+};
+
 // Update a service provider
 const updateServiceProvider = async (req, res) => {
   try {
-    const { name, email, phoneNo, role, dob, gender, services, question } =
-      req.body;
+    const { name, email, phoneNo, role, dob, gender, services, question } = req.body;
     const provider = await ServiceProvider.findByIdAndUpdate(
       req.params.id,
       { name, email, phoneNo, role, dob, gender, services, question },
       { new: true }
     );
     if (!provider) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Provider not found" });
+      return res.status(404).json({ success: false, error: "Provider not found" });
     }
     return res.status(200).json({ success: true, provider });
   } catch (error) {

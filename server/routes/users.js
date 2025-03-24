@@ -11,17 +11,18 @@ import {
   approveServiceProvider,
   deleteServiceProvider,
 } from "../controllers/usersController.js";
+import verifyUser from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 router.get("/gharUsers", getUsers);
-router.get("/currentUser", getCurrentUser);
+router.get("/currentUser", verifyUser, getCurrentUser);
 router.get("/gharUsers/:id", getUserById);
-router.put("/gharUsers/:id", updateUser);
+router.put("/gharUsers/:id", verifyUser, updateUser);
 router.delete("/gharUsers/:id", deleteUser);
 router.get("/serviceProvider", getServiceProvider);
 router.get("/serviceProvider/:id", getServiceProviderById);
-router.put("/serviceProvider/:id", updateServiceProvider);
+router.put("/serviceProvider/:id", verifyUser, updateServiceProvider);
 router.put("/serviceProvider/approve/:id", approveServiceProvider);
 router.delete("/serviceProvider/:id", deleteServiceProvider);
 
