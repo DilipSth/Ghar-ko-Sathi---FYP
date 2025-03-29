@@ -18,8 +18,8 @@ import ViewServiceProvider from "../Pages/Users/ServiceProvider/ViewServiceProvi
 import EditServiceProvider from "../Pages/Users/ServiceProvider/EditServiceProvider";
 import ViewUser from "../Pages/Users/Users/ViewUser";
 import EditUser from "../Pages/Users/Users/EditUser";
-import ServiceProviderMap from "../Pages/Menu/Map/ServiceProviderMaps";
 import PendingApproval from "../Pages/PendingApproval";
+import Maps from "../Pages/Menu/Map/ServiceProviderMaps";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -72,11 +72,11 @@ const AdminRoutes = () => {
             element={
               user?.role === "serviceProvider" ? (
                 <RoleBaseRoutes requiredRole={["serviceProvider", "admin"]} requireApproval={true}>
-                  <ServiceProviderMap />
+                  <Maps />
                 </RoleBaseRoutes>
               ) : (
                 <RoleBaseRoutes requiredRole={["admin"]}>
-                  <ServiceProviderMap />
+                  <Maps />
                 </RoleBaseRoutes>
               )
             } 
