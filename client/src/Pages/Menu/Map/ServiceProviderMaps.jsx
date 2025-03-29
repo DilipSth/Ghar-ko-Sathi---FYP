@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const Maps = () => {
+const ServiceProviderMap = () => {
   const [activeTab, setActiveTab] = useState('available');
   const [currentRequest, setCurrentRequest] = useState(null);
   const [bookingState, setBookingState] = useState('idle'); // idle, reviewing, accepted, ongoing, completed
@@ -620,7 +620,7 @@ const Maps = () => {
                       <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
                     </div>
                     <p className="text-gray-700 italic">
-                      Great service! Very professional and fixed the issue quickly.
+                      "Great service! Very professional and fixed the issue quickly."
                     </p>
                   </div>
                 </div>
@@ -642,4 +642,4 @@ const Maps = () => {
   );
 };
 
-export default Maps;
+export default ServiceProviderMap;

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
-const Maps = () => {
+const UserMaps = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [bookingState, setBookingState] = useState('idle'); // idle, waiting, accepted, ongoing, completed
   const [bookingDetails, setBookingDetails] = useState(null);
@@ -472,4 +472,4 @@ const Maps = () => {
   );
 };
 
-export default Maps;
+export default UserMaps;
