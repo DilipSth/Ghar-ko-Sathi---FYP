@@ -1,4 +1,3 @@
-// ServiceProvider.js
 import mongoose from "mongoose";
 
 const ServiceProviderSchema = new mongoose.Schema({
@@ -12,10 +11,12 @@ const ServiceProviderSchema = new mongoose.Schema({
     required: true,
     default: "serviceProvider",
   },
-  approved: { type: Boolean, default: false }, // Add this field
+  approved: { type: Boolean, default: false },
   dob: { type: Date, required: true },
   gender: { type: String, required: true },
-  services: { type: String, required: true },
+  services: [
+    { type: mongoose.Schema.Types.ObjectId, ref: "Services", required: true },
+  ],
   question: { type: String, required: true },
   profileImage: { type: String },
   citizenshipImage: { type: String },
@@ -24,6 +25,9 @@ const ServiceProviderSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-const ServiceProvider = mongoose.model("ServiceProvider", ServiceProviderSchema);
+const ServiceProvider = mongoose.model(
+  "ServiceProvider",
+  ServiceProviderSchema
+);
 
 export default ServiceProvider;

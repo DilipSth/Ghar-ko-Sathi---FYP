@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const servicesSchema = new mongoose.Schema({
   ser_name: { type: String, required: true },
-  serviceImage: { type: String }, // Added this field for storing image filename
+  serviceImage: { type: String },
   createAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

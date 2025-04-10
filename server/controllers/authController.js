@@ -8,10 +8,10 @@ import bcrypt from "bcrypt";
 // Multer Configuration of User Register
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/registerImage"); // Ensure this directory exists
+    cb(null, "public/registerImage");
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Add timestamp to filenames
+    cb(null, Date.now() + path.extname(file.originalname));
   },
 });
 
@@ -30,25 +30,20 @@ const registerUser = async (req, res) => {
       role = "user",
     } = req.body;
 
-    // Validate inputs
     if (!name || !email || !password || !dob || !gender || !phoneNo) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // Image paths
     const profileImage = req.files?.profileImage?.[0]?.filename || null;
     const citizenshipImage = req.files?.citizenshipImage?.[0]?.filename || null;
 
-    // Check for existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "Email already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Save user
     const newUser = new User({
       name,
       email,
@@ -77,33 +72,42 @@ const registerServiceProvider = async (req, res) => {
       password,
       dob,
       gender,
-      services,
+      services, // Now an array of service IDs (e.g., ["id1", "id2"])
       phoneNo,
       role = "serviceProvider",
       question,
     } = req.body;
 
     // Validate inputs
-    if (!name || !email || !password || !dob || !gender || !phoneNo || !services) {
-      return res.status(400).json({ error: "All fields are required" });
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !dob ||
+      !gender ||
+      !phoneNo ||
+      !services ||
+      !Array.isArray(services)
+    ) {
+      return res
+        .status(400)
+        .json({
+          error: "All fields are required, and services must be an array",
+        });
     }
 
-    // Image paths
     const profileImage = req.files?.profileImage?.[0]?.filename || null;
     const citizenshipImage = req.files?.citizenshipImage?.[0]?.filename || null;
     const certificationImage =
       req.files?.certificationImage?.[0]?.filename || null;
 
-    // Check for existing ServiceProvider
     const existingServiceProvider = await ServiceProvider.findOne({ email });
     if (existingServiceProvider) {
       return res.status(400).json({ error: "Email already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Save ServiceProvider
     const newServiceProvider = new ServiceProvider({
       name,
       email,
@@ -116,7 +120,7 @@ const registerServiceProvider = async (req, res) => {
       citizenshipImage,
       certificationImage,
       question,
-      services,
+      services, // Array of ObjectIds
     });
 
     const savedServiceProvider = await newServiceProvider.save();
@@ -130,68 +134,63 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check in User model
     let user = await User.findOne({ email });
-    let userType = 'user';
+    let userType = "user";
 
-    // If not found in User model, check in ServiceProvider model
     if (!user) {
       user = await ServiceProvider.findOne({ email });
-      userType = 'serviceProvider';
-      
-      // Check if service provider is approved
-      if (user && user.role === 'serviceProvider' && !user.approved) {
-        // We still allow login, but return the approved status so frontend can redirect accordingly
+      userType = "serviceProvider";
+
+      if (user && user.role === "serviceProvider" && !user.approved) {
         const token = jwt.sign(
           { _id: user._id, role: user.role },
           process.env.JWT_KEY,
           { expiresIn: "10d" }
         );
-        
+
         return res.status(200).json({
           success: true,
           token,
-          user: { _id: user._id, name: user.name, role: user.role, approved: false },
-          message: "Your account is pending approval from an administrator."
+          user: {
+            _id: user._id,
+            name: user.name,
+            role: user.role,
+            approved: false,
+          },
+          message: "Your account is pending approval from an administrator.",
         });
       }
     }
 
-    // If user is not found in either model
     if (!user) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, error: "Wrong password" });
     }
 
-    // Generate token
     const token = jwt.sign(
       { _id: user._id, role: user.role },
       process.env.JWT_KEY,
       { expiresIn: "10d" }
     );
 
-    // Include approved status for service providers
-    const userData = { 
-      _id: user._id, 
-      name: user.name, 
-      role: user.role 
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      role: user.role,
     };
-    
-    // Add approved status only for service providers
-    if (userType === 'serviceProvider') {
+
+    if (userType === "serviceProvider") {
       userData.approved = user.approved;
     }
 
-    // Return success response
     res.status(200).json({
       success: true,
       token,
-      user: userData
+      user: userData,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -210,4 +209,10 @@ const verify = async (req, res) => {
   }
 };
 
-export { login, registerUser, registerServiceProvider, registerImage, verify};
+export {
+  login,
+  registerUser,
+  registerServiceProvider,
+  registerImage,
+  verify,
+}; /*  */
