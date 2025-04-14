@@ -12,21 +12,25 @@ const masterItems = [
         to: "/dashboard/menu/maps",
         label: "Live Maps",
         icon: <TbMapStar className="text-xl" />,
+        allowedRoles: ["admin", "user", "serviceProvider"]
       },
       {
         to: "/dashboard/menu/services",
         label: "Services",
         icon: <GiAutoRepair className="text-xl" />,
+        allowedRoles: ["admin", "user", "serviceProvider"]
       },
       {
         to: "/dashboard/menu/users",
         label: "User's",
         icon: <FaUsers className="text-xl" />,
+        allowedRoles: ["admin"]
       },
       {
         to: "/dashboard/menu/serviceProvider",
         label: "Service Provider",
         icon: <FaUsers className="text-xl" />,
+        allowedRoles: ["admin"]
       },
     ],
   },
@@ -39,11 +43,13 @@ const masterItems = [
         to: "/dashboard/account/settings",
         label: "Settings",
         icon: <IoSettingsOutline className="text-xl" />,
+        allowedRoles: ["admin", "user", "serviceProvider"]
       },
       {
         to: "/dashboard/web-content/designations",
         label: "Security",
         icon: <IoShieldOutline className="text-xl" />,
+        allowedRoles: ["admin", "user", "serviceProvider"]
       },
     ],
   },
@@ -54,6 +60,7 @@ const masterItems = [
       {
         to: "/dashboard/web-content/departments",
         label: "Privacy Policy",
+        allowedRoles: ["admin", "user", "serviceProvider"]
         // icon: <FcServices className="text-xl"/>,
       },
     ],

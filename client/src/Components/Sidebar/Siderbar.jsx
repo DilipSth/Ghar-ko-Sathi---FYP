@@ -1,19 +1,39 @@
-import { NavLink } from "react-router-dom";
+/* eslint-disable react/prop-types */
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { BiHome } from "react-icons/bi";
 import { AiOutlineClose } from "react-icons/ai";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useAuth } from "../../context/authContext";
 import masterItems from "../../lib/Menu";
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
-  const { user } = useAuth(); // Access user from auth context
-  const [activeRoute, setActiveRoute] = useState(() => {
-    return localStorage.getItem("activeRoute") || "/dashboard";
-  });
+  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Function to get default route based on user role
+  const getDefaultRoute = (role) => {
+    switch (role) {
+      case "serviceProvider":
+        return "/dashboard/menu/maps";
+      case "user":
+        return "/dashboard/menu/services";
+      case "admin":
+        return "/dashboard";
+      default:
+        return "/dashboard";
+    }
+  };
 
+  // Set initial active route based on current location or default route
   useEffect(() => {
-    localStorage.setItem("activeRoute", activeRoute);
-  }, [activeRoute]);
+    if (location.pathname === "/dashboard") {
+      const defaultRoute = getDefaultRoute(user?.role);
+      if (defaultRoute !== "/dashboard") {
+        navigate(defaultRoute);
+      }
+    }
+  }, [user?.role, location.pathname, navigate]);
 
   useEffect(() => {
     if (isOpen) {
@@ -24,18 +44,22 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   }, [isOpen]);
 
   const renderNavItem = (item) => {
+    // Check if user has permission to see this item
+    if (item.allowedRoles && !item.allowedRoles.includes(user?.role)) {
+      return null;
+    }
+
     return (
       <NavLink
         key={item.label}
         to={item.to}
         className={({ isActive }) =>
           `flex items-center gap-5 text-[1.1rem] no-underline pl-8 py-2.5 pr-0 rounded-lg transition ease-in-out duration-300 w-72 ${
-            isActive || activeRoute === item.to
+            isActive
               ? "bg-[#FAFAFA] text-[#2460B9]"
               : "text-[#E0E0E0] hover:bg-[#FAFAFA] hover:text-[#2460B9]"
           }`
         }
-        onClick={() => setActiveRoute(item.to)} // Update active route on click
       >
         {item.icon}
         {item.label}
@@ -43,18 +67,16 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     );
   };
 
-  // Filter out "User's" section if the user is not an admin
-  const filteredMasterItems = masterItems.map((group) => {
-    if (group.label === "Menu") {
-      return {
-        ...group,
-        children: group.children.filter(
-          (item) => item.label !== "User's" || user?.role === "admin"
-        ),
-      };
-    }
-    return group;
-  });
+  // Filter menu items based on user role
+  const filteredMasterItems = masterItems.map((group) => ({
+    ...group,
+    children: group.children.filter((item) => {
+      return !item.allowedRoles || item.allowedRoles.includes(user?.role);
+    }),
+  })).filter(group => group.children.length > 0);
+
+  // Check if user has permission to see the home page
+  const showHome = user?.role === "admin";
 
   return (
     <div
@@ -80,20 +102,22 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
       {/* Scrollable Sidebar Content */}
       <div className="flex flex-col gap-5 font-inter max-md:items-center pt-10 overflow-y-auto h-[calc(100vh-5rem)]">
-        <NavLink
-          to="/dashboard"
-          className={({ isActive }) =>
-            `flex w-72 items-center gap-5 text-[1.1rem] no-underline pl-8 py-2.5 pr-0 rounded-lg transition ease-in-out duration-300 ${
-              activeRoute === "/dashboard"
-                ? "bg-[#FAFAFA] text-[#2460B9]"
-                : "text-[#E0E0E0] hover:bg-[#FAFAFA] hover:text-[#2460B9]"
-            }`
-          }
-          onClick={() => setActiveRoute("/dashboard")}
-        >
-          <BiHome className="text-2xl" />
-          Home
-        </NavLink>
+        {showHome && (
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) =>
+              `flex w-72 items-center gap-5 text-[1.1rem] no-underline pl-8 py-2.5 pr-0 rounded-lg transition ease-in-out duration-300 ${
+                isActive && location.pathname === "/dashboard"
+                  ? "bg-[#FAFAFA] text-[#2460B9]"
+                  : "text-[#E0E0E0] hover:bg-[#FAFAFA] hover:text-[#2460B9]"
+              }`
+            }
+            end
+          >
+            <BiHome className="text-2xl" />
+            Home
+          </NavLink>
+        )}
 
         {filteredMasterItems.map((group) => (
           <div key={group.label}>
