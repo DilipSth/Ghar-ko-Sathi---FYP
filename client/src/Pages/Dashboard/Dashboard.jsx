@@ -1,7 +1,55 @@
 import { FaUsers } from "react-icons/fa";
 import { GiAutoRepair } from "react-icons/gi";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 const Dashboard = () => {
+  const [userCount, setUserCount] = useState(0);
+  const [serviceProviderCount, setServiceProviderCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      setLoading(true);
+      try {
+        // Fetch user count
+        const userResponse = await axios.get(
+          "http://localhost:8000/api/users/gharUsers",
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+        
+        if (userResponse.data.success) {
+          setUserCount(userResponse.data.users.length);
+        }
+
+        // Fetch service provider count
+        const providerResponse = await axios.get(
+          "http://localhost:8000/api/users/serviceProvider",
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+        
+        if (providerResponse.data.success) {
+          setServiceProviderCount(providerResponse.data.serviceProviders.length);
+        }
+      } catch (err) {
+        setError("Failed to fetch data");
+        console.error("Error fetching counts:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCounts();
+  }, []);
   return (
     <div className="p-4">
        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -40,7 +88,9 @@ const Dashboard = () => {
             <h3 className="font-bold text-2xl mb-1 text-center text-blue-500">
               User&apos;s
             </h3>
-            <p className="text-[23px] font-semibold text-blue-500">11</p>
+            <p className="text-[23px] font-semibold text-blue-500">
+              {loading ? "Loading..." : userCount}
+            </p>
           </div>
 
           <div className="bg-white p-4 rounded-lg shadow-md flex flex-col items-center justify-center gap-2">
@@ -49,7 +99,9 @@ const Dashboard = () => {
             <h3 className="font-bold text-2xl mb-1 text-center text-green-500">
               Service Provider
             </h3>
-            <p className="text-[23px] font-semibold text-green-500">10</p>
+            <p className="text-[23px] font-semibold text-green-500">
+              {loading ? "Loading..." : serviceProviderCount}
+            </p>
           </div>
         </div>
       </div>
