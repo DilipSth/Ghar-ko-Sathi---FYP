@@ -22,6 +22,8 @@ import PendingApproval from "../Pages/PendingApproval";
 import Maps from "../Pages/Menu/Map/ServiceProviderMaps";
 import ServiceProviderMap from "../Pages/Menu/Map/ServiceProviderMaps";
 import UserMaps from "../Pages/Menu/Map/UserMaps";
+import Security from "../Pages/Legal/Security";
+import Privacy from "../Pages/Legal/Privacy";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -151,6 +153,12 @@ const AdminRoutes = () => {
         {/* Account Settings Route - Available to all authenticated users */}
         <Route path="account" element={<Outlet />}>
           <Route path="settings" element={<Settings />} />
+        </Route>
+
+        {/* Legal Pages Route - Available to all authenticated users */}
+        <Route path="legal" element={<Outlet />}>
+          <Route path="security" element={<Security />} />
+          <Route path="privacy" element={<Privacy />} />
         </Route>
       </Route>
 

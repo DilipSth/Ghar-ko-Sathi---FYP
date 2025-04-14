@@ -46,7 +46,7 @@ const masterItems = [
         allowedRoles: ["admin", "user", "serviceProvider"]
       },
       {
-        to: "/dashboard/web-content/designations",
+        to: "/dashboard/legal/security",
         label: "Security",
         icon: <IoShieldOutline className="text-xl" />,
         allowedRoles: ["admin", "user", "serviceProvider"]
@@ -58,7 +58,7 @@ const masterItems = [
     icon: null,
     children: [
       {
-        to: "/dashboard/web-content/departments",
+        to: "/dashboard/legal/privacy",
         label: "Privacy Policy",
         allowedRoles: ["admin", "user", "serviceProvider"]
         // icon: <FcServices className="text-xl"/>,
