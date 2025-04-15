@@ -10,6 +10,9 @@ const ServiceProviderMap = () => {
   const [serviceHistory, setServiceHistory] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [locationName, setLocationName] = useState('');
+  const [currentPosition, setCurrentPosition] = useState(null);
+  const [userPhone, setUserPhone] = useState('');
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
 
@@ -118,6 +121,28 @@ const ServiceProviderMap = () => {
     setBookingState('idle');
   };
 
+  const handlePositionUpdate = (position) => {
+    setCurrentPosition(position);
+  };
+
+  useEffect(() => {
+    if (currentPosition) {
+      const getLocationName = async () => {
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentPosition.lat}&lon=${currentPosition.lng}`
+          );
+          const data = await response.json();
+          setLocationName(data.display_name || `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
+        } catch (error) {
+          setLocationName(`${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
+        }
+      };
+
+      getLocationName();
+    }
+  }, [currentPosition]);
+
   return (
     <div className="p-4 h-full">
       <div className="bg-white p-4 rounded-lg shadow-md h-full flex flex-col">
@@ -145,7 +170,7 @@ const ServiceProviderMap = () => {
           {bookingState === 'idle' && (
             <>
               <div className="h-2/3 w-full rounded overflow-hidden mb-4">
-                <LiveTracking bookingDetails={currentRequest} showDirections={bookingState === 'ongoing'} />
+                <LiveTracking bookingDetails={currentRequest} showDirections={bookingState === 'ongoing'} onPositionUpdate={handlePositionUpdate} />
               </div>
               {activeTab === 'available' && (
                 <div className="h-1/3 overflow-y-auto">
@@ -161,6 +186,8 @@ const ServiceProviderMap = () => {
                                   <h5 className="font-medium">{request.details.address.split(',')[0]}</h5>
                                   <p className="text-xs text-gray-600">{request.details.service} - {request.details.issue}</p>
                                   <p className="text-xs text-gray-600">{new Date(request.details.requestTime).toLocaleTimeString()}</p>
+                                  <p className="text-xs text-gray-600">Phone: {request.userPhone}</p>
+                                  <p className="text-xs text-gray-600">Location: {request.userLocationName}</p>
                                 </div>
                               </div>
                               <button onClick={() => viewRequest(request)} className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700">View Details</button>
@@ -246,6 +273,14 @@ const ServiceProviderMap = () => {
                     <p className="text-sm font-semibold">Service</p>
                     <p>{currentRequest.details.service}</p>
                   </div>
+                  <div>
+                    <p className="text-sm font-semibold">Phone</p>
+                    <p>{currentRequest.userPhone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Location</p>
+                    <p>{currentRequest.userLocationName}</p>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={declineRequest} className="py-2 border border-gray-300 rounded-lg hover:bg-gray-100">Decline</button>
@@ -262,6 +297,8 @@ const ServiceProviderMap = () => {
                 <div className="space-y-2">
                   <p className="text-sm"><span className="font-semibold">Service:</span> {currentRequest.details.service}</p>
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
+                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone}</p>
+                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName}</p>
                 </div>
               </div>
             </div>
@@ -273,6 +310,8 @@ const ServiceProviderMap = () => {
                 <div className="space-y-2 mb-6">
                   <p className="text-sm"><span className="font-semibold">Service:</span> {currentRequest.details.service}</p>
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
+                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone}</p>
+                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName}</p>
                   {currentRequest.details.description && (
                     <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
                   )}
@@ -288,6 +327,8 @@ const ServiceProviderMap = () => {
                 <div className="space-y-2 mb-4">
                   <p className="text-sm"><span className="font-semibold">Service:</span> {currentRequest.details.service}</p>
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
+                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone}</p>
+                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName}</p>
                   <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
                 </div>
                 <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useContext } from "react";
+import { useState, useRef, useEffect, useContext, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useAuth } from "../../../context/authContext";
 import { SocketContext } from "../../../context/SocketContext";
@@ -255,6 +255,134 @@ const UserMaps = () => {
     setComment("");
   };
 
+  // State for location name
+  const [locationName, setLocationName] = useState('');
+
+  // Cache for location names to avoid excessive API calls
+  const locationNameCache = useRef({});
+
+  // Mock location data for when API is unavailable
+  const mockLocationData = useMemo(() => ({
+    '27.7172,85.3238': 'Kathmandu, Nepal',
+    '27.6933,85.3424': 'Patan, Lalitpur, Nepal',
+    '27.6710,85.4298': 'Bhaktapur, Nepal',
+    '27.7030,85.3143': 'Kirtipur, Nepal',
+    '27.7500,85.3500': 'Budhanilkantha, Nepal',
+  }), []);
+
+  // Get location name from coordinates with caching and offline fallback
+  const getLocationName = useCallback(async (lat, lng) => {
+    // Create a cache key from coordinates (rounded to 4 decimal places for better caching)
+    const cacheKey = `${parseFloat(lat).toFixed(4)},${parseFloat(lng).toFixed(4)}`;
+    
+    // Return from cache if available
+    if (locationNameCache.current[cacheKey]) {
+      return locationNameCache.current[cacheKey];
+    }
+    
+    // Check if we have mock data for these coordinates (or nearby)
+    for (const [mockCoords, mockName] of Object.entries(mockLocationData)) {
+      const [mockLat, mockLng] = mockCoords.split(',').map(Number);
+      // Check if coordinates are close (within ~1km)
+      if (Math.abs(mockLat - lat) < 0.01 && Math.abs(mockLng - lng) < 0.01) {
+        locationNameCache.current[cacheKey] = mockName;
+        return mockName;
+      }
+    }
+    
+    try {
+      // First try our own backend if available
+      try {
+        // This would be your own backend endpoint that might proxy the geocoding request
+        // or have its own database of locations
+        const response = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`, { signal: AbortSignal.timeout(2000) });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.name) {
+            locationNameCache.current[cacheKey] = data.name;
+            return data.name;
+          }
+        }
+      } catch {
+        // Silently fail and try next option
+      }
+      
+      // Try OpenStreetMap API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+          {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Ghar-ko-Sathi-App',
+              'Accept-Language': 'en'
+            }
+          }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const locationName = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        
+        // Cache the result
+        locationNameCache.current[cacheKey] = locationName;
+        
+        return locationName;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err; // Re-throw to be caught by outer try-catch
+      }
+    } catch {
+      // Fallback to coordinates with area approximation
+      let fallbackName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      
+      // Try to approximate location based on coordinates
+      if (lat > 27.6 && lat < 27.8 && lng > 85.2 && lng < 85.5) {
+        fallbackName += ' (Kathmandu Valley)';
+      }
+      
+      // Cache the fallback result too
+      locationNameCache.current[cacheKey] = fallbackName;
+      
+      return fallbackName;
+    }
+  }, [mockLocationData]);
+
+  // Update location name when position changes, with debounce
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (currentPosition) {
+      const updateLocationName = async () => {
+        try {
+          const name = await getLocationName(currentPosition.lat, currentPosition.lng);
+          if (isMounted) setLocationName(name);
+        } catch {
+          // Silently fail and keep previous value
+          if (isMounted && !locationName) {
+            setLocationName(`${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
+          }
+        }
+      };
+      
+      // Use a timeout to debounce API calls
+      const timeoutId = setTimeout(updateLocationName, 1000);
+      
+      return () => {
+        isMounted = false;
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [currentPosition, getLocationName, locationName]);
+
   return (
     <div className="p-4 h-full">
       <div className="bg-white p-4 rounded-lg shadow-md h-full flex flex-col">
@@ -372,6 +500,7 @@ const UserMaps = () => {
                           </div>
                           <p className="text-sm text-gray-600 mb-1"><span className="font-medium">Services:</span> {provider.services}</p>
                           <p className="text-sm text-gray-600 mb-2"><span className="font-medium">Jobs:</span> {provider.completedJobs}</p>
+                          <p className="text-sm text-gray-600 mb-2"><span className="font-medium">Phone:</span> {provider.phone}</p>
                           <button 
                             className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-sm transition-colors"
                             onClick={(e) => {
@@ -424,6 +553,9 @@ const UserMaps = () => {
                       </div>
                       <p className="text-sm text-gray-600">
                         {selectedProvider.services}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {selectedProvider.phone}
                       </p>
                     </div>
                   </div>
@@ -500,6 +632,10 @@ const UserMaps = () => {
                         <span className="font-semibold">Description:</span>
                         <span className="text-right">{description}</span>
                       </p>
+                      <p className="text-sm flex justify-between">
+                        <span className="font-semibold">Phone:</span>
+                        <span>{selectedProvider.phone}</span>
+                      </p>
                     </div>
                     <button
                       onClick={resetBooking}
@@ -539,6 +675,10 @@ const UserMaps = () => {
                       <p className="text-sm">
                         <span className="font-semibold">Description:</span>{" "}
                         {bookingDetails.description}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-semibold">Phone:</span>{" "}
+                        {bookingDetails.details.providerPhone}
                       </p>
                     </div>
                     <div className="flex gap-3">
@@ -587,6 +727,10 @@ const UserMaps = () => {
                         <span className="font-semibold">Description:</span>{" "}
                         {bookingDetails.description}
                       </p>
+                      <p className="text-sm">
+                        <span className="font-semibold">Phone:</span>{" "}
+                        {bookingDetails.details.providerPhone}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -620,6 +764,10 @@ const UserMaps = () => {
                         <span className="font-semibold">Description:</span>{" "}
                         {bookingDetails.description}
                       </p>
+                      <p className="text-sm">
+                        <span className="font-semibold">Phone:</span>{" "}
+                        {bookingDetails.details.providerPhone}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -651,6 +799,10 @@ const UserMaps = () => {
                       <p className="text-sm">
                         <span className="font-semibold">Services:</span>{" "}
                         {bookingDetails.details.providerServices}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-semibold">Phone:</span>{" "}
+                        {bookingDetails.details.providerPhone}
                       </p>
                     </div>
                     <button
@@ -688,6 +840,10 @@ const UserMaps = () => {
                       <p className="text-sm">
                         <span className="font-semibold">Method:</span> Cash
                         (Static)
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-semibold">Phone:</span>{" "}
+                        {bookingDetails.details.providerPhone}
                       </p>
                     </div>
                     <button
