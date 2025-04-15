@@ -25,6 +25,9 @@ const ServiceProviderMap = () => {
   const [routeToUser, setRouteToUser] = useState([]);
   const [eta, setEta] = useState(null);
   const [distance, setDistance] = useState(null);
+  // Add states for maintenance details
+  const [maintenanceNotes, setMaintenanceNotes] = useState('');
+  const [maintenancePrice, setMaintenancePrice] = useState('');
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
 
@@ -242,6 +245,24 @@ const ServiceProviderMap = () => {
     }
   };
 
+  // Function to handle maintenance details submission
+  const handleMaintenanceSubmit = () => {
+    if (currentRequest && socket) {
+      socket.emit("updateMaintenanceDetails", {
+        bookingId: currentRequest.bookingId,
+        maintenanceNotes,
+        maintenancePrice: parseFloat(maintenancePrice) || 0
+      });
+      
+      // Update the current request with maintenance details
+      setCurrentRequest(prev => ({
+        ...prev,
+        maintenanceNotes,
+        maintenancePrice
+      }));
+    }
+  };
+
   // Update route when position changes
   useEffect(() => {
     if (bookingState === 'accepted' || bookingState === 'confirmed' || bookingState === 'ongoing') {
@@ -408,6 +429,13 @@ const ServiceProviderMap = () => {
                     <p className="text-sm font-semibold">Location</p>
                     <p>{currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
                   </div>
+                  {/* Show user's description if available */}
+                  {currentRequest.details.description && (
+                    <div>
+                      <p className="text-sm font-semibold">User's Description</p>
+                      <p className="bg-gray-50 p-2 rounded">{currentRequest.details.description}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={declineRequest} className="py-2 border border-gray-300 rounded-lg hover:bg-gray-100">Decline</button>
@@ -426,6 +454,10 @@ const ServiceProviderMap = () => {
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
                   <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone || '9812345678'}</p>
                   <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
+                  {/* Show user's description if available */}
+                  {currentRequest.details.description && (
+                    <p className="text-sm"><span className="font-semibold">User's Description:</span> {currentRequest.details.description}</p>
+                  )}
                 </div>
                 
                 <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
@@ -467,7 +499,7 @@ const ServiceProviderMap = () => {
                   <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone || '9812345678'}</p>
                   <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
                   {currentRequest.details.description && (
-                    <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
+                    <p className="text-sm"><span className="font-semibold">User's Description:</span> {currentRequest.details.description}</p>
                   )}
                 </div>
                 
@@ -511,7 +543,9 @@ const ServiceProviderMap = () => {
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
                   <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone || '9812345678'}</p>
                   <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
-                  <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
+                  {currentRequest.details.description && (
+                    <p className="text-sm"><span className="font-semibold">User's Description:</span> {currentRequest.details.description}</p>
+                  )}
                 </div>
                 <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
                   <LiveTracking 
@@ -540,6 +574,39 @@ const ServiceProviderMap = () => {
                   </div>
                 )}
                 
+                {/* Add maintenance details form */}
+                <div className="border rounded-lg p-3 mb-4">
+                  <h4 className="font-medium mb-2">Maintenance Details</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Service Notes</label>
+                      <textarea 
+                        className="w-full border rounded-lg p-2 text-sm" 
+                        rows="3"
+                        placeholder="Enter details about the service performed"
+                        value={maintenanceNotes}
+                        onChange={(e) => setMaintenanceNotes(e.target.value)}
+                      ></textarea>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Price (Rs)</label>
+                      <input 
+                        type="number" 
+                        className="w-full border rounded-lg p-2 text-sm"
+                        placeholder="Enter service price"
+                        value={maintenancePrice}
+                        onChange={(e) => setMaintenancePrice(e.target.value)}
+                      />
+                    </div>
+                    <button 
+                      onClick={handleMaintenanceSubmit}
+                      className="w-full bg-blue-500 text-white py-1 rounded-lg hover:bg-blue-600 text-sm"
+                    >
+                      Save Details
+                    </button>
+                  </div>
+                </div>
+                
                 <button onClick={completeJob} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -554,6 +621,26 @@ const ServiceProviderMap = () => {
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-4">User Confirmed Completion</h3>
                 <p className="text-gray-600 mb-4">The user has confirmed the job is complete.</p>
+                
+                {/* Display maintenance details if available */}
+                {(currentRequest.maintenanceNotes || currentRequest.maintenancePrice) && (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <h4 className="font-medium mb-2">Service Details</h4>
+                    {currentRequest.maintenanceNotes && (
+                      <div className="mb-2">
+                        <p className="text-sm font-semibold">Service Notes:</p>
+                        <p className="text-sm">{currentRequest.maintenanceNotes}</p>
+                      </div>
+                    )}
+                    {currentRequest.maintenancePrice && (
+                      <div>
+                        <p className="text-sm font-semibold">Price:</p>
+                        <p className="text-lg font-bold">Rs. {currentRequest.maintenancePrice}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <button onClick={goBackToIdle} className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Back to Dashboard</button>
               </div>
             </div>
@@ -563,6 +650,26 @@ const ServiceProviderMap = () => {
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-4">Job Completed</h3>
                 <p className="text-gray-600 mb-4">Waiting for user review.</p>
+                
+                {/* Display maintenance details if available */}
+                {(currentRequest.maintenanceNotes || currentRequest.maintenancePrice) && (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <h4 className="font-medium mb-2">Service Details</h4>
+                    {currentRequest.maintenanceNotes && (
+                      <div className="mb-2">
+                        <p className="text-sm font-semibold">Service Notes:</p>
+                        <p className="text-sm">{currentRequest.maintenanceNotes}</p>
+                      </div>
+                    )}
+                    {currentRequest.maintenancePrice && (
+                      <div>
+                        <p className="text-sm font-semibold">Price:</p>
+                        <p className="text-lg font-bold">Rs. {currentRequest.maintenancePrice}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <button onClick={goBackToIdle} className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Back to Dashboard</button>
               </div>
             </div>
@@ -575,6 +682,26 @@ const ServiceProviderMap = () => {
                   <p className="text-sm"><span className="font-semibold">Rating:</span> {currentRequest.review.rating} ★</p>
                   <p className="text-sm"><span className="font-semibold">Comment:</span> {currentRequest.review.comment}</p>
                 </div>
+                
+                {/* Display maintenance details if available */}
+                {(currentRequest.maintenanceNotes || currentRequest.maintenancePrice) && (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <h4 className="font-medium mb-2">Service Details</h4>
+                    {currentRequest.maintenanceNotes && (
+                      <div className="mb-2">
+                        <p className="text-sm font-semibold">Service Notes:</p>
+                        <p className="text-sm">{currentRequest.maintenanceNotes}</p>
+                      </div>
+                    )}
+                    {currentRequest.maintenancePrice && (
+                      <div>
+                        <p className="text-sm font-semibold">Price:</p>
+                        <p className="text-lg font-bold">Rs. {currentRequest.maintenancePrice}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <button onClick={goBackToIdle} className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Back to Dashboard</button>
               </div>
             </div>
