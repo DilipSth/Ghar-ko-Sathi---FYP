@@ -71,7 +71,8 @@ const Services = () => {
   }, [selectedService]);
 
   const handleServiceClick = (service) => {
-    setSelectedService(service);
+    // Navigate directly to the map page with the selected service
+    navigate("/dashboard/menu/maps", { state: { selectedService: service.name } });
   };
 
   const handleBackToServices = () => {

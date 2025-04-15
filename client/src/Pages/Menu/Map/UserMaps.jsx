@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../../../context/authContext";
 import { SocketContext } from "../../../context/SocketContext";
 import LiveTracking from "../../../Components/LiveTracking";
+import { useLocation } from "react-router-dom";
 
 const UserMaps = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -23,6 +24,8 @@ const UserMaps = () => {
   const mapContainerRef = useRef(null);
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
+  const location = useLocation();
+  const selectedService = location.state?.selectedService || null;
 
   useEffect(() => {
     if (!socket) return;
@@ -120,8 +123,13 @@ const UserMaps = () => {
     setLoading(true);
     setError(null);
     try {
+      // Add the selected service as a query parameter if it exists
+      const url = selectedService
+        ? `http://localhost:8000/api/users/serviceProvider?service=${selectedService}`
+        : "http://localhost:8000/api/users/serviceProvider";
+      
       const response = await axios.get(
-        "http://localhost:8000/api/users/serviceProvider",
+        url,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
@@ -176,7 +184,7 @@ const UserMaps = () => {
 
   useEffect(() => {
     fetchServiceProviders();
-  }, []);
+  }, [selectedService]); // Add selectedService as a dependency
 
   const filteredProviders = serviceProviders.filter((provider) => {
     if (activeFilter === "All") return true;
