@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useContext } from "react";
 import axios from "axios";
-import io from "socket.io-client";
 import { useAuth } from "../../../context/authContext";
+import { SocketContext } from "../../../context/SocketContext";
+import LiveTracking from "../../../Components/LiveTracking";
 
 const UserMaps = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -15,69 +16,63 @@ const UserMaps = () => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const mapContainerRef = useRef(null);
-  const socketRef = useRef(null);
   const { user } = useAuth();
+  const { socket } = useContext(SocketContext);
 
   useEffect(() => {
-    socketRef.current = io("http://localhost:8000", {
-      auth: { token: localStorage.getItem("token") },
-    });
-
-    socketRef.current.on("connect", () => {
-      socketRef.current.emit("register", { userId: user._id, role: user.role });
-    });
-
-    socketRef.current.on("bookingAccepted", (booking) => {
+    if (!socket) return;
+    
+    socket.on("bookingAccepted", (booking) => {
       setBookingState("accepted");
       setBookingDetails(booking);
     });
 
-    socketRef.current.on("bookingDeclined", (data) => {
+    socket.on("bookingDeclined", (data) => {
       setBookingState("idle");
       setBookingDetails(null);
       alert(data.message);
     });
 
-    socketRef.current.on("bookingError", (data) => {
+    socket.on("bookingError", (data) => {
       setBookingState("idle");
       setBookingDetails(null);
       alert(data.message);
     });
 
-    socketRef.current.on("bookingConfirmedByUser", (booking) => {
+    socket.on("bookingConfirmedByUser", (booking) => {
       setBookingState("confirmed");
       setBookingDetails(booking);
     });
 
-    socketRef.current.on("jobStarted", (booking) => {
+    socket.on("jobStarted", (booking) => {
       setBookingState("ongoing");
       setBookingDetails(booking);
     });
 
-    socketRef.current.on("providerCompletedJob", (booking) => {
+    socket.on("providerCompletedJob", (booking) => {
       setBookingState("provider-completed");
       setBookingDetails(booking);
     });
 
-    socketRef.current.on("jobCompleted", (booking) => {
+    socket.on("jobCompleted", (booking) => {
       setBookingState("completed");
       setBookingDetails(booking);
     });
 
-    socketRef.current.on("paymentSuccess", (data) => {
+    socket.on("paymentSuccess", (data) => {
       setBookingState("paid");
       alert(data.message);
     });
 
-    socketRef.current.on("reviewSubmitted", (data) => {
+    socket.on("reviewSubmitted", (data) => {
       setBookingState("reviewed");
       alert(data.message);
     });
 
     return () => {
-      socketRef.current.disconnect();
+      // Socket disconnection is handled by SocketProvider
     };
-  }, [user]);
+  }, [user, socket]);
 
   const fetchServiceProviders = async () => {
     setLoading(true);
@@ -133,9 +128,8 @@ const UserMaps = () => {
     return false;
   });
 
-  const handleMapClick = (providerId) => {
+  const handleProviderSelect = (provider) => {
     if (bookingState === "idle") {
-      const provider = serviceProviders.find((p) => p.id === providerId);
       setSelectedProvider(provider);
     }
   };
@@ -151,7 +145,7 @@ const UserMaps = () => {
         address: "123 Example St, Kathmandu",
         description,
       };
-      socketRef.current.emit("sendBookingRequest", bookingData);
+      socket.emit("sendBookingRequest", bookingData);
       setBookingDetails(bookingData);
     } else {
       alert("Please enter a problem description.");
@@ -159,16 +153,16 @@ const UserMaps = () => {
   };
 
   const confirmBooking = () => {
-    if (bookingDetails) {
-      socketRef.current.emit("confirmBooking", {
+    if (bookingDetails && socket) {
+      socket.emit("confirmBooking", {
         bookingId: bookingDetails.bookingId,
       });
     }
   };
 
   const completeJob = () => {
-    if (bookingDetails) {
-      socketRef.current.emit("completeJob", {
+    if (bookingDetails && socket) {
+      socket.emit("completeJob", {
         bookingId: bookingDetails.bookingId,
         completedBy: "user",
       });
@@ -176,16 +170,16 @@ const UserMaps = () => {
   };
 
   const submitPayment = () => {
-    if (bookingDetails) {
-      socketRef.current.emit("submitPayment", {
+    if (bookingDetails && socket) {
+      socket.emit("submitPayment", {
         bookingId: bookingDetails.bookingId,
       });
     }
   };
 
   const submitReview = () => {
-    if (bookingDetails && rating > 0) {
-      socketRef.current.emit("submitReview", {
+    if (bookingDetails && rating > 0 && socket) {
+      socket.emit("submitReview", {
         bookingId: bookingDetails.bookingId,
         rating,
         comment,
@@ -251,52 +245,20 @@ const UserMaps = () => {
           </div>
         )}
         {!loading && !error && (
-          <div
-            ref={mapContainerRef}
-            className="flex-grow rounded overflow-hidden relative"
-          >
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3532.856520737962!2d85.324!3d27.7031!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39eb191e9c5b5c5b%3A0x9c8dc9e8b8f8b8e6!2sKathmandu%2C%20Nepal!5e0!3m2!1sen!2sus!4v1634930201234!5m2!1sen!2sus"
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              allowFullScreen=""
-              loading="lazy"
-            ></iframe>
-            <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
-              {bookingState === "idle" && (
-                <div className="w-full h-full">
-                  {filteredProviders.map((provider) => (
-                    <div
-                      key={provider.id}
-                      className="absolute cursor-pointer"
-                      style={{
-                        top: `${provider.position.y}%`,
-                        left: `${provider.position.x}%`,
-                        transform: "translate(-50%, -50%)",
-                        pointerEvents: "auto",
-                      }}
-                      onClick={() => handleMapClick(provider.id)}
-                    >
-                      <div className="relative">
-                        <img
-                          src={provider.image}
-                          alt={provider.name}
-                          className="rounded-full border-2 border-blue-500 w-12 h-12 object-cover"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = "/api/placeholder/50/50";
-                          }}
-                        />
-                        <span className="absolute bottom-0 right-0 bg-green-500 rounded-full w-3 h-3"></span>
-                      </div>
-                      <div className="bg-white text-xs p-1 rounded shadow mt-1 text-center">
-                        {provider.name}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <div className="flex flex-col flex-grow">
+            <div
+              ref={mapContainerRef}
+              className="h-2/3 rounded overflow-hidden mb-4"
+            >
+              <LiveTracking 
+                bookingDetails={bookingDetails} 
+                showDirections={bookingState === "ongoing"} 
+                serviceProviders={filteredProviders}
+                onProviderSelect={handleProviderSelect}
+              />
+            </div>
+            <div className="h-1/3 overflow-y-auto relative">
+              {/* Service provider markers are now handled by LiveTracking */}
               {selectedProvider && bookingState === "idle" && (
                 <div
                   className="absolute bg-white rounded-lg shadow-lg p-4"
@@ -304,8 +266,9 @@ const UserMaps = () => {
                     bottom: "20px",
                     left: "50%",
                     transform: "translateX(-50%)",
-                    width: "300px",
+                    width: "350px",
                     pointerEvents: "auto",
+                    zIndex: 1000
                   }}
                 >
                   <button
@@ -318,76 +281,108 @@ const UserMaps = () => {
                     <img
                       src={selectedProvider.image}
                       alt={selectedProvider.name}
-                      className="w-12 h-12 rounded-full mr-3 object-cover"
+                      className="w-16 h-16 rounded-full mr-3 object-cover border-2 border-blue-500"
                     />
                     <div>
-                      <h4 className="font-bold">{selectedProvider.name}</h4>
+                      <h4 className="font-bold text-lg">{selectedProvider.name}</h4>
+                      <div className="flex items-center">
+                        <span className="text-yellow-500 mr-1">{selectedProvider.rating}</span>
+                        <span className="text-yellow-500">★</span>
+                        <span className="text-sm text-gray-500 ml-1">({selectedProvider.completedJobs} jobs)</span>
+                      </div>
                       <p className="text-sm text-gray-600">
                         {selectedProvider.services}
                       </p>
                     </div>
                   </div>
-                  <div className="mb-3">
-                    <p className="text-sm">
-                      <span className="font-semibold">Phone:</span>{" "}
-                      {selectedProvider.phone}
+                  <div className="mb-4 bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm flex justify-between">
+                      <span className="font-semibold">Phone:</span>
+                      <span>{selectedProvider.phone}</span>
                     </p>
-                    <p className="text-sm">
-                      <span className="font-semibold">Services:</span>{" "}
-                      {selectedProvider.services}
+                    <p className="text-sm flex justify-between">
+                      <span className="font-semibold">Services:</span>
+                      <span className="text-right">{selectedProvider.services}</span>
                     </p>
-                    <p className="text-sm">
-                      <span className="font-semibold">Rate:</span> Rs
-                      {selectedProvider.hourlyRate}/hour
+                    <p className="text-sm flex justify-between">
+                      <span className="font-semibold">Rate:</span>
+                      <span>Rs {selectedProvider.hourlyRate}/hour</span>
+                    </p>
+                    <p className="text-sm flex justify-between">
+                      <span className="font-semibold">Status:</span>
+                      <span className="text-green-500 font-medium">{selectedProvider.status}</span>
                     </p>
                   </div>
-                  <textarea
-                    className="w-full p-2 border border-gray-300 rounded-md mb-4"
-                    placeholder="Describe your problem"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                  <button
-                    onClick={handleBooking}
-                    className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-                  >
-                    Book Now
-                  </button>
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Describe your problem</label>
+                    <textarea
+                      className="w-full p-3 border border-gray-300 rounded-md mb-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      placeholder="Please describe your issue in detail..."
+                      rows="3"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={resetBooking}
+                      className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition duration-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleBooking}
+                      className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center justify-center"
+                      disabled={!description}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+                      </svg>
+                      Book Now
+                    </button>
+                  </div>
                 </div>
               )}
               {bookingState === "waiting" && bookingDetails && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
+                <div className="bg-white rounded-lg shadow-lg p-4">
                   <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6 text-center">
                     <div className="animate-pulse mb-4">
-                      <div className="w-12 h-12 mx-auto rounded-full bg-blue-500"></div>
+                      <div className="w-16 h-16 mx-auto rounded-full bg-blue-500 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                        </svg>
+                      </div>
                     </div>
                     <h3 className="text-xl font-bold mb-2">
                       Waiting for {selectedProvider.name} to Accept
                     </h3>
                     <p className="text-gray-600 mb-4">
-                      Your request has been sent.
+                      Your request has been sent and is waiting for confirmation.
                     </p>
-                    <p className="text-sm">
-                      <span className="font-semibold">Services:</span>{" "}
-                      {selectedProvider.services}
-                    </p>
+                    <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                      <p className="text-sm flex justify-between">
+                        <span className="font-semibold">Services:</span>
+                        <span>{selectedProvider.services}</span>
+                      </p>
+                      <p className="text-sm flex justify-between">
+                        <span className="font-semibold">Description:</span>
+                        <span className="text-right">{description}</span>
+                      </p>
+                    </div>
                     <button
                       onClick={resetBooking}
-                      className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 mt-4"
+                      className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition duration-200 flex items-center justify-center"
                     >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
                       Cancel Request
                     </button>
                   </div>
                 </div>
               )}
               {bookingState === "accepted" && bookingDetails && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
+                <div className="bg-white rounded-lg shadow-lg p-4">
                   <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                     <h3 className="text-xl font-bold mb-4">Booking Accepted</h3>
                     <p className="text-gray-600 mb-4">
@@ -432,10 +427,7 @@ const UserMaps = () => {
                 </div>
               )}
               {bookingState === "confirmed" && bookingDetails && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
+                <div className="bg-white rounded-lg shadow-lg p-4">
                   <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                     <h3 className="text-xl font-bold mb-4">
                       Booking Confirmed
@@ -468,10 +460,7 @@ const UserMaps = () => {
                 </div>
               )}
               {bookingState === "ongoing" && bookingDetails && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
+                <div className="bg-white rounded-lg shadow-lg p-4">
                   <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                     <h3 className="text-xl font-bold mb-4">
                       Service in Progress
@@ -542,10 +531,7 @@ const UserMaps = () => {
                 </div>
               )}
               {bookingState === "completed" && bookingDetails && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
+                <div className="bg-white rounded-lg shadow-lg p-4">
                   <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                     <h3 className="text-xl font-bold mb-4">Payment</h3>
                     <p className="text-gray-600 mb-4">

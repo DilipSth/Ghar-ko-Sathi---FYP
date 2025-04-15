@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import io from 'socket.io-client';
+import { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../../../context/authContext';
+import { SocketContext } from '../../../context/SocketContext';
+import LiveTracking from '../../../Components/LiveTracking';
 
 const ServiceProviderMap = () => {
   const [activeTab, setActiveTab] = useState('available');
@@ -10,47 +11,41 @@ const ServiceProviderMap = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [isAvailable, setIsAvailable] = useState(true);
   const { user } = useAuth();
-  const socketRef = useRef(null);
+  const { socket } = useContext(SocketContext);
 
   useEffect(() => {
-    socketRef.current = io('http://localhost:8000', {
-      auth: { token: localStorage.getItem("token") },
-    });
+    if (!socket) return;
 
-    socketRef.current.on("connect", () => {
-      socketRef.current.emit("register", { userId: user._id, role: user.role });
-    });
-
-    socketRef.current.on("newBookingRequest", (booking) => {
+    socket.on("newBookingRequest", (booking) => {
       setPendingRequests((prev) => [...prev, booking]);
     });
 
-    socketRef.current.on("bookingConfirmed", (booking) => {
+    socket.on("bookingConfirmed", (booking) => {
       setBookingState('accepted');
       setCurrentRequest(booking);
     });
 
-    socketRef.current.on("bookingConfirmedByUser", (booking) => {
+    socket.on("bookingConfirmedByUser", (booking) => {
       setBookingState('confirmed');
       setCurrentRequest(booking);
     });
 
-    socketRef.current.on("problemDescriptionReceived", (booking) => {
+    socket.on("problemDescriptionReceived", (booking) => {
       setBookingState('confirmed');
       setCurrentRequest(booking);
     });
 
-    socketRef.current.on("jobStartedSuccess", (booking) => {
+    socket.on("jobStartedSuccess", (booking) => {
       setBookingState('ongoing');
       setCurrentRequest(booking);
     });
 
-    socketRef.current.on("userCompletedJob", (booking) => {
+    socket.on("userCompletedJob", (booking) => {
       setBookingState('user-completed');
       setCurrentRequest(booking);
     });
 
-    socketRef.current.on("jobCompleted", (booking) => {
+    socket.on("jobCompleted", (booking) => {
       setBookingState('completed');
       setCurrentRequest(booking);
       setServiceHistory((prev) => [
@@ -68,15 +63,15 @@ const ServiceProviderMap = () => {
       ]);
     });
 
-    socketRef.current.on("reviewReceived", (booking) => {
+    socket.on("reviewReceived", (booking) => {
       setBookingState('reviewed');
       setCurrentRequest(booking);
     });
 
     return () => {
-      socketRef.current.disconnect();
+      // Socket disconnection is handled by SocketProvider
     };
-  }, [user]);
+  }, [user, socket]);
 
   const toggleAvailability = () => {
     setIsAvailable(!isAvailable);
@@ -88,15 +83,15 @@ const ServiceProviderMap = () => {
   };
 
   const acceptRequest = () => {
-    if (currentRequest) {
-      socketRef.current.emit("acceptBooking", { bookingId: currentRequest.bookingId });
+    if (currentRequest && socket) {
+      socket.emit("acceptBooking", { bookingId: currentRequest.bookingId });
       setPendingRequests(pendingRequests.filter(req => req.bookingId !== currentRequest.bookingId));
     }
   };
 
   const declineRequest = () => {
-    if (currentRequest) {
-      socketRef.current.emit("declineBooking", { bookingId: currentRequest.bookingId });
+    if (currentRequest && socket) {
+      socket.emit("declineBooking", { bookingId: currentRequest.bookingId });
       setPendingRequests(pendingRequests.filter(req => req.bookingId !== currentRequest.bookingId));
       setCurrentRequest(null);
       setBookingState('idle');
@@ -104,14 +99,14 @@ const ServiceProviderMap = () => {
   };
 
   const startJob = () => {
-    if (currentRequest) {
-      socketRef.current.emit("startJob", { bookingId: currentRequest.bookingId });
+    if (currentRequest && socket) {
+      socket.emit("startJob", { bookingId: currentRequest.bookingId });
     }
   };
 
   const completeJob = () => {
-    if (currentRequest) {
-      socketRef.current.emit("completeJob", {
+    if (currentRequest && socket) {
+      socket.emit("completeJob", {
         bookingId: currentRequest.bookingId,
         completedBy: "provider",
       });
@@ -146,19 +141,15 @@ const ServiceProviderMap = () => {
             Earnings
           </button>
         </div>
-        <div className="flex-grow rounded overflow-hidden relative">
+        <div className="flex flex-col h-full">
           {bookingState === 'idle' && (
             <>
-              <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3532.856520737962!2d85.324!3d27.7031!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39eb191e9c5b5c5b%3A0x9c8dc9e8b8f8b8e6!2sKathmandu%2C%20Nepal!5e0!3m2!1sen!2sus!4v1634930201234!5m2!1sen!2sus" width="100%" height="100%" style={{ border: 0 }} allowFullScreen="" loading="lazy"></iframe>
-              <div className="absolute" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-                <div className="relative">
-                  <div className="w-6 h-6 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white text-xs">You</div>
-                  <div className="absolute -top-1 -left-1 w-8 h-8 rounded-full bg-blue-500 opacity-30 animate-ping"></div>
-                </div>
+              <div className="h-2/3 w-full rounded overflow-hidden mb-4">
+                <LiveTracking bookingDetails={currentRequest} showDirections={bookingState === 'ongoing'} />
               </div>
               {activeTab === 'available' && (
-                <div className="absolute bottom-4 left-4 right-4">
-                  <div className="bg-white rounded-lg shadow-lg p-4 max-h-64 overflow-y-auto">
+                <div className="h-1/3 overflow-y-auto">
+                  <div className="bg-white rounded-lg shadow-lg p-4">
                     <h4 className="font-semibold mb-4">Available Requests</h4>
                     {pendingRequests.length > 0 ? (
                       <div className="space-y-3">
@@ -186,8 +177,8 @@ const ServiceProviderMap = () => {
                 </div>
               )}
               {activeTab === 'history' && (
-                <div className="absolute bottom-4 left-4 right-4">
-                  <div className="bg-white rounded-lg shadow-lg p-4 max-h-64 overflow-y-auto">
+                <div className="h-1/3 overflow-y-auto">
+                  <div className="bg-white rounded-lg shadow-lg p-4">
                     <h4 className="font-semibold mb-4">Service History</h4>
                     {serviceHistory.length > 0 ? (
                       <div className="space-y-3">
@@ -216,7 +207,7 @@ const ServiceProviderMap = () => {
                 </div>
               )}
               {activeTab === 'earnings' && (
-                <div className="absolute bottom-4 left-4 right-4">
+                <div className="h-1/3 overflow-y-auto">
                   <div className="bg-white rounded-lg shadow-lg p-4">
                     <h4 className="font-semibold mb-4">Earnings Summary</h4>
                     <div className="grid grid-cols-3 gap-4 mb-4">
@@ -294,12 +285,20 @@ const ServiceProviderMap = () => {
             <div className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4 pointer-events-auto">
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-4">Service in Progress</h3>
-                <div className="space-y-2 mb-6">
+                <div className="space-y-2 mb-4">
                   <p className="text-sm"><span className="font-semibold">Service:</span> {currentRequest.details.service}</p>
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
                   <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
                 </div>
-                <button onClick={completeJob} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Complete Job</button>
+                <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
+                  <LiveTracking bookingDetails={currentRequest} showDirections={true} />
+                </div>
+                <button onClick={completeJob} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Complete Job
+                </button>
               </div>
             </div>
           )}
