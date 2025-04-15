@@ -227,6 +227,60 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
     };
   }, []);
 
+  // Function to update position and emit if needed
+  const updatePosition = useCallback((position) => {
+    try {
+      // Extract coordinates with additional data
+      const { latitude, longitude, accuracy, heading, speed } = position.coords;
+      
+      // Create new position object with enhanced data
+      const newPosition = {
+        lat: latitude,
+        lng: longitude,
+        accuracy: accuracy,
+        heading: heading || 0,
+        speed: speed || 0,
+        timestamp: new Date().getTime()
+      };
+      
+      console.log("Position updated:", newPosition);
+      
+      // Update state with new position
+      setCurrentPosition(newPosition);
+      
+      // Set loading to false once we have a position
+      setLocationLoading(false);
+      
+      // If user is a service provider, emit location update
+      if (user?.role === 'serviceProvider' && socket && socket.connected) {
+        console.log("Emitting location update to server");
+        socket.emit('update-location', {
+          userId: user._id,
+          location: newPosition,
+          timestamp: new Date().getTime()
+        });
+      }
+      
+      // Call the callback if provided
+      if (onPositionUpdate) {
+        onPositionUpdate(newPosition);
+      }
+    } catch (error) {
+      console.error("Error updating position:", error);
+      // Use default center as fallback
+      setCurrentPosition(defaultCenter);
+      setLocationLoading(false);
+    }
+  }, [user, socket, onPositionUpdate, defaultCenter]);
+
+  // Function to handle geolocation errors with fallback
+  const handleGeolocationError = useCallback(() => {
+    console.log("Handling geolocation error, using fallback position");
+    // Use default position as fallback
+    setCurrentPosition(defaultCenter);
+    setLocationLoading(false);
+  }, [defaultCenter]);
+
   // Get current position on component mount
   useEffect(() => {
     // Flag to track if we're using simulated location
@@ -255,8 +309,8 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
       }, 500);
     };
 
-    // Function to handle geolocation errors with fallback
-    const handleGeolocationError = () => {
+    // Local function to handle geolocation errors with fallback
+    const localHandleGeolocationError = () => {
       // Use default position as fallback and start simulation
       if (!usingSimulatedLocation) {
         usingSimulatedLocation = true;
@@ -265,88 +319,65 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
       }
     };
 
-    // Function to update position and emit if needed
-    const updatePosition = (position) => {
-      try {
-        // Extract coordinates
-        const { latitude, longitude } = position.coords;
-        
-        // Create new position object
-        const newPosition = {
-          lat: latitude,
-          lng: longitude
-        };
-        
-        // Update state with new position
-        setCurrentPosition(newPosition);
-        
-        // Set loading to false once we have a position
-        setLocationLoading(false);
-        
-        // If user is a service provider, emit location update
-        if (user?.role === 'serviceProvider' && socket) {
-          socket.emit('update-location', {
-            userId: user._id,
-            location: newPosition
-          });
-        }
-        
-        // Call the callback if provided
-        if (onPositionUpdate) {
-          onPositionUpdate(newPosition);
-        }
-      } catch (error) {
-        void error; // Explicitly ignore error
-        handleGeolocationError();
-      }
-    };
-
-    // Start watching position
-    const startWatchingPosition = () => {
-      if (navigator.geolocation) {
-        try {
-          watchIdRef.current = navigator.geolocation.watchPosition(
-            updatePosition,
-            () => {
-              // Only fall back to simulation if we don't have a position yet
-              if (!currentPosition || currentPosition === defaultCenter) {
-                handleGeolocationError();
-              }
-            },
-            {
-              enableHighAccuracy: true,
-              maximumAge: 10000,
-              timeout: 5000
-            }
-          );
-        } catch (error) {
-          void error; // Explicitly ignore error
-          handleGeolocationError();
-        }
-      } else {
-        handleGeolocationError();
-      }
-    };
-
     // Setup geolocation
     const setupGeolocation = () => {
       if (navigator.geolocation) {
         try {
-          // Get initial position
+          // Show loading indicator
+          setLocationLoading(true);
+          
+          // Get initial position with high accuracy
           navigator.geolocation.getCurrentPosition(
-            updatePosition,
-            handleGeolocationError,
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+            (position) => {
+              console.log("Initial position obtained:", position.coords);
+              updatePosition(position);
+              
+              // Start watching for position changes after getting initial position
+              if (navigator.geolocation) {
+                try {
+                  // Clear any existing watch
+                  if (watchIdRef.current) {
+                    navigator.geolocation.clearWatch(watchIdRef.current);
+                  }
+                  
+                  // Set up a new watch with improved settings
+                  watchIdRef.current = navigator.geolocation.watchPosition(
+                    updatePosition,
+                    (error) => {
+                      console.error("Geolocation error:", error.message);
+                      localHandleGeolocationError();
+                    },
+                    {
+                      enableHighAccuracy: true,
+                      maximumAge: 0, // Always get fresh position
+                      timeout: 10000 // Longer timeout for better accuracy
+                    }
+                  );
+                  
+                  console.log("Started watching position with ID:", watchIdRef.current);
+                } catch (error) {
+                  console.error("Error setting up geolocation watch:", error);
+                  localHandleGeolocationError();
+                }
+              }
+            },
+            (error) => {
+              console.error("Error getting initial position:", error.message);
+              localHandleGeolocationError();
+            },
+            { 
+              enableHighAccuracy: true, 
+              timeout: 15000, // Longer initial timeout
+              maximumAge: 0 // Always get fresh position
+            }
           );
-
-          // Set up watch with very permissive settings
-          startWatchingPosition();
         } catch (error) {
-          void error; // Explicitly ignore error
-          handleGeolocationError();
+          console.error("Exception in setupGeolocation:", error);
+          localHandleGeolocationError();
         }
       } else {
-        handleGeolocationError();
+        console.error("Geolocation not supported by browser");
+        localHandleGeolocationError();
       }
     };
 
@@ -355,20 +386,21 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
     
     // Clean up on unmount
     return () => {
+      // Clear geolocation watch
       if (watchIdRef.current) {
-        try {
-          navigator.geolocation.clearWatch(watchIdRef.current);
-        } catch (error) {
-          void error; // Explicitly ignore error
-          // Ignore error
-        }
+        console.log("Clearing geolocation watch:", watchIdRef.current);
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
       
+      // Clear simulation interval
       if (movementInterval) {
+        console.log("Clearing movement simulation interval");
         clearInterval(movementInterval);
+        movementInterval = null;
       }
     };
-  }, [user, socket, simulateMovement, currentPosition, onPositionUpdate]);
+  }, [user, socket, simulateMovement, currentPosition, onPositionUpdate, updatePosition, defaultCenter]);
 
   // Update all service providers from props
   useEffect(() => {
@@ -796,6 +828,114 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
 
     fetchRoute();
   }, [showDirections, bookingAccepted, serviceProviderPosition, currentPosition]);
+
+  // Add a new effect to handle socket reconnection
+  useEffect(() => {
+    if (socket) {
+      const handleReconnect = () => {
+        console.log('Socket reconnected, restarting position watch');
+        // Restart position watching when socket reconnects
+        if (navigator.geolocation && watchIdRef.current === null) {
+          // Setup geolocation again
+          if (navigator.geolocation) {
+            try {
+              // Show loading indicator
+              setLocationLoading(true);
+              
+              // Get initial position with high accuracy
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  console.log("Initial position obtained after reconnect:", position.coords);
+                  // Update position
+                  try {
+                    const { latitude, longitude, accuracy, heading, speed } = position.coords;
+                    
+                    const newPosition = {
+                      lat: latitude,
+                      lng: longitude,
+                      accuracy: accuracy,
+                      heading: heading || 0,
+                      speed: speed || 0,
+                      timestamp: new Date().getTime()
+                    };
+                    
+                    console.log("Position updated after reconnect:", newPosition);
+                    
+                    // Update state with new position
+                    setCurrentPosition(newPosition);
+                    setLocationLoading(false);
+                    
+                    // If user is a service provider, emit location update
+                    if (user?.role === 'serviceProvider' && socket && socket.connected) {
+                      socket.emit('update-location', {
+                        userId: user._id,
+                        location: newPosition,
+                        timestamp: new Date().getTime()
+                      });
+                    }
+                    
+                    // Call the callback if provided
+                    if (onPositionUpdate) {
+                      onPositionUpdate(newPosition);
+                    }
+                  } catch (error) {
+                    console.error("Error updating position after reconnect:", error);
+                    handleGeolocationError();
+                  }
+                  
+                  // Start watching for position changes
+                  if (navigator.geolocation) {
+                    try {
+                      // Clear any existing watch
+                      if (watchIdRef.current) {
+                        navigator.geolocation.clearWatch(watchIdRef.current);
+                      }
+                      
+                      // Set up a new watch with improved settings
+                      watchIdRef.current = navigator.geolocation.watchPosition(
+                        updatePosition,
+                        (error) => {
+                          console.error("Geolocation error after reconnect:", error.message);
+                        },
+                        {
+                          enableHighAccuracy: true,
+                          maximumAge: 0, // Always get fresh position
+                          timeout: 10000 // Longer timeout for better accuracy
+                        }
+                      );
+                      
+                      console.log("Restarted watching position with ID:", watchIdRef.current);
+                    } catch (error) {
+                      console.error("Error restarting geolocation watch:", error);
+                      handleGeolocationError();
+                    }
+                  }
+                },
+                (error) => {
+                  console.error("Error getting initial position after reconnect:", error.message);
+                  handleGeolocationError();
+                },
+                { 
+                  enableHighAccuracy: true, 
+                  timeout: 15000, // Longer initial timeout
+                  maximumAge: 0 // Always get fresh position
+                }
+              );
+            } catch (error) {
+              console.error("Exception in reconnect geolocation setup:", error);
+              handleGeolocationError();
+            }
+          }
+        }
+      };
+      
+      socket.on('connect', handleReconnect);
+      
+      return () => {
+        socket.off('connect', handleReconnect);
+      };
+    }
+  }, [socket, user, onPositionUpdate, updatePosition, handleGeolocationError]);
 
   return (
     <>
