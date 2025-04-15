@@ -17,8 +17,11 @@ const ServiceProviderMap = () => {
     const savedPosition = localStorage.getItem('serviceProviderPosition');
     return savedPosition ? JSON.parse(savedPosition) : null;
   });
-  const [userPhone, setUserPhone] = useState('');
-  const [userPosition, setUserPosition] = useState(null);
+  const [userPhone, setUserPhone] = useState('9812345678'); // Default user phone number
+  const [userPosition, setUserPosition] = useState({
+    lat: 27.7172,
+    lng: 85.3240
+  }); // Islington College coordinates
   const [routeToUser, setRouteToUser] = useState([]);
   const [eta, setEta] = useState(null);
   const [distance, setDistance] = useState(null);
@@ -111,7 +114,12 @@ const ServiceProviderMap = () => {
   };
 
   const viewRequest = (request) => {
-    setCurrentRequest(request);
+    setCurrentRequest({
+      ...request,
+      userPhone: userPhone,
+      userLocationName: 'Islington College, Kamal Marg, Kathmandu',
+      userLocation: userPosition
+    });
     setBookingState('reviewing');
   };
 
@@ -394,11 +402,11 @@ const ServiceProviderMap = () => {
                   </div>
                   <div>
                     <p className="text-sm font-semibold">Phone</p>
-                    <p>{currentRequest.userPhone}</p>
+                    <p>{currentRequest.userPhone || '9812345678'}</p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold">Location</p>
-                    <p>{currentRequest.userLocationName}</p>
+                    <p>{currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -416,8 +424,8 @@ const ServiceProviderMap = () => {
                 <div className="space-y-2">
                   <p className="text-sm"><span className="font-semibold">Service:</span> {currentRequest.details.service}</p>
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
-                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone}</p>
-                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName}</p>
+                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone || '9812345678'}</p>
+                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
                 </div>
                 
                 <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
@@ -456,8 +464,8 @@ const ServiceProviderMap = () => {
                 <div className="space-y-2 mb-6">
                   <p className="text-sm"><span className="font-semibold">Service:</span> {currentRequest.details.service}</p>
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
-                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone}</p>
-                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName}</p>
+                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone || '9812345678'}</p>
+                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
                   {currentRequest.details.description && (
                     <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
                   )}
@@ -501,8 +509,8 @@ const ServiceProviderMap = () => {
                 <div className="space-y-2 mb-4">
                   <p className="text-sm"><span className="font-semibold">Service:</span> {currentRequest.details.service}</p>
                   <p className="text-sm"><span className="font-semibold">Address:</span> {currentRequest.details.address}</p>
-                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone}</p>
-                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName}</p>
+                  <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone || '9812345678'}</p>
+                  <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName || 'Islington College, Kamal Marg, Kathmandu'}</p>
                   <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
                 </div>
                 <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
