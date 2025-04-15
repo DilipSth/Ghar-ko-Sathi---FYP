@@ -248,6 +248,9 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
       // Update state with new position
       setCurrentPosition(newPosition);
       
+      // Store position in localStorage for persistence
+      localStorage.setItem('userCurrentPosition', JSON.stringify(newPosition));
+      
       // Set loading to false once we have a position
       setLocationLoading(false);
       
@@ -259,6 +262,9 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
           location: newPosition,
           timestamp: new Date().getTime()
         });
+        
+        // Store service provider position separately
+        localStorage.setItem('serviceProviderPosition', JSON.stringify(newPosition));
       }
       
       // Call the callback if provided
@@ -283,6 +289,24 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
 
   // Get current position on component mount
   useEffect(() => {
+    // Try to get stored position first
+    const storedPosition = localStorage.getItem('userCurrentPosition');
+    if (storedPosition) {
+      try {
+        const parsedPosition = JSON.parse(storedPosition);
+        console.log("Using stored position:", parsedPosition);
+        setCurrentPosition(parsedPosition);
+        setLocationLoading(false);
+        
+        // If callback provided, call it with stored position
+        if (onPositionUpdate) {
+          onPositionUpdate(parsedPosition);
+        }
+      } catch (e) {
+        console.error("Error parsing stored position:", e);
+      }
+    }
+    
     // Flag to track if we're using simulated location
     let usingSimulatedLocation = false;
     let movementInterval = null;
@@ -463,95 +487,49 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
     if (!socket || !user || user?.role === 'serviceProvider') return;
     
     const handleLocationUpdate = (data) => {
-      try {
-        // Validate location data
-        if (!data || !data.location || typeof data.location.lat !== 'number' || typeof data.location.lng !== 'number') {
-          return;
-        }
-
-        // Update service provider position if it matches our booking
-        if (bookingDetails && data.userId === bookingDetails.providerId) {
-          // Store current position for animation
-          if (serviceProviderPosition) {
-            setPreviousPositions(prev => {
-              // Keep last 5 positions for trail effect
-              const positions = [...prev, serviceProviderPosition];
-              return positions.slice(-5);
-            });
-          }
-          
-          const newPosition = {
-            lat: data.location.lat,
-            lng: data.location.lng
-          };
-          
-          // Animate the marker movement
-          if (serviceProviderPosition && markerRef.current) {
-            const startPosition = [serviceProviderPosition.lat, serviceProviderPosition.lng];
-            const endPosition = [newPosition.lat, newPosition.lng];
-            
-            // Calculate if provider is moving (position changed significantly)
-            const movementThreshold = 0.0001; // About 10 meters
-            const isSignificantMovement = 
-              Math.abs(startPosition[0] - endPosition[0]) > movementThreshold || 
-              Math.abs(startPosition[1] - endPosition[1]) > movementThreshold;
-            
-            setIsMoving(isSignificantMovement);
-            
-            // Set last update time
-            setLastUpdateTime(new Date());
-            
-            // Update tracking status based on distance
-            if (currentPosition) {
-              const dist = calculateDistance(
-                currentPosition.lat, currentPosition.lng,
-                newPosition.lat, newPosition.lng
-              );
-              
-              setDistance(dist);
-              
-              // Update ETA (3 mins per km as a simple approximation)
-              const estimatedMinutes = Math.ceil(dist * 3);
-              setEta(estimatedMinutes);
-              
-              // Update tracking status
-              if (dist < 0.2) { // Less than 200 meters
-                setTrackingStatus('arriving');
-              } else if (dist < 5) { // Less than 5 km
-                setTrackingStatus('active');
-              } else {
-                setTrackingStatus('active');
-              }
-            }
-          }
-          
-          setServiceProviderPosition(newPosition);
+      if (data && data.location && bookingDetails?.details?.providerId === data.userId) {
+        console.log("Received location update from service provider:", data);
+        
+        // Store the service provider's location for persistence
+        localStorage.setItem('activeServiceProviderLocation', JSON.stringify(data.location));
+        
+        setServiceProviderPosition(data.location);
+        setPreviousPositions(prev => {
+          const newPositions = [data.location, ...prev];
+          return newPositions.slice(0, 5); // Keep only last 5 positions
+        });
+        
+        // Calculate if provider is moving
+        if (previousPositions.length > 0) {
+          const prevPos = previousPositions[0];
+          const currentPos = data.location;
+          const distance = calculateDistance(prevPos.lat, prevPos.lng, currentPos.lat, currentPos.lng);
+          setIsMoving(distance > 0.005); // Moving if more than 5 meters
         }
         
-        // Update all service providers if they're in our list
-        setAllServiceProviders(prev => {
-          return prev.map(provider => {
-            if (provider.id === data.userId) {
-              return {
-                ...provider,
-                realTimeLocation: data.location
-              };
-            }
-            return provider;
-          });
-        });
-      } catch (error) {
-        void error; // Explicitly ignore error
-        // Ignore error
+        // Update last update time
+        setLastUpdateTime(new Date().getTime());
       }
     };
-
+    
+    // Try to get stored service provider location first
+    const storedProviderLocation = localStorage.getItem('activeServiceProviderLocation');
+    if (storedProviderLocation && bookingDetails) {
+      try {
+        const parsedPosition = JSON.parse(storedProviderLocation);
+        console.log("Using stored service provider position:", parsedPosition);
+        setServiceProviderPosition(parsedPosition);
+      } catch (e) {
+        console.error("Error parsing stored service provider position:", e);
+      }
+    }
+    
     socket.on('location-update', handleLocationUpdate);
-
+    
     return () => {
       socket.off('location-update', handleLocationUpdate);
     };
-  }, [socket, bookingDetails, user, serviceProviderPosition, currentPosition, calculateDistance]);
+  }, [socket, user, bookingDetails, previousPositions, calculateDistance]);
 
   // State for location names
   const [userLocationName, setUserLocationName] = useState('');

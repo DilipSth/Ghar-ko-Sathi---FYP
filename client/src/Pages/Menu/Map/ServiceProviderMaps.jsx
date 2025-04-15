@@ -12,7 +12,11 @@ const ServiceProviderMap = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [isAvailable, setIsAvailable] = useState(true);
   const [locationName, setLocationName] = useState('');
-  const [currentPosition, setCurrentPosition] = useState(null);
+  // Initialize currentPosition from localStorage if available
+  const [currentPosition, setCurrentPosition] = useState(() => {
+    const savedPosition = localStorage.getItem('serviceProviderPosition');
+    return savedPosition ? JSON.parse(savedPosition) : null;
+  });
   const [userPhone, setUserPhone] = useState('');
   const [userPosition, setUserPosition] = useState(null);
   const [routeToUser, setRouteToUser] = useState([]);
@@ -168,6 +172,8 @@ const ServiceProviderMap = () => {
 
   const handlePositionUpdate = (position) => {
     setCurrentPosition(position);
+    // Save position to localStorage whenever it updates
+    localStorage.setItem('serviceProviderPosition', JSON.stringify(position));
   };
 
   useEffect(() => {
@@ -241,6 +247,9 @@ const ServiceProviderMap = () => {
     
     const intervalId = setInterval(() => {
       if (currentRequest?.bookingId) {
+        // Save position to localStorage before sending update
+        localStorage.setItem('serviceProviderPosition', JSON.stringify(currentPosition));
+        
         socket.emit('location-update', {
           userId: user.id,
           bookingId: currentRequest.bookingId,
