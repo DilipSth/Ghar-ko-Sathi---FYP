@@ -7,24 +7,27 @@ import { useAuth } from '../context/authContext';
 import PropTypes from 'prop-types';
 
 // Fix for Leaflet marker icons
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+// Use direct URLs instead of imports to ensure icons load properly
+const iconUrl = 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png';
+const shadowUrl = 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png';
 
+// Set up default icon
 let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
+  iconUrl: iconUrl,
+  shadowUrl: shadowUrl,
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41]
 });
 
+// Set default icon for all markers
 L.Marker.prototype.options.icon = DefaultIcon;
 
 // Custom icons for different users
 const userIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: iconShadow,
+  shadowUrl: shadowUrl,
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -33,7 +36,7 @@ const userIcon = new L.Icon({
 
 const providerIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: iconShadow,
+  shadowUrl: shadowUrl,
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -43,7 +46,7 @@ const providerIcon = new L.Icon({
 // Default center (Kathmandu, Nepal)
 const defaultCenter = {
   lat: 27.7172,
-  lng: 85.3240
+  lng: 85.3238
 };
 
 // Component to automatically update map view when positions change
@@ -64,7 +67,7 @@ MapUpdater.propTypes = {
   zoom: PropTypes.number
 };
 
-const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders = [], onProviderSelect = null }) => {
+const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders = [], onProviderSelect = null, onPositionUpdate = null }) => {
   const [currentPosition, setCurrentPosition] = useState(defaultCenter);
   const [serviceProviderPosition, setServiceProviderPosition] = useState(null);
   const [allServiceProviders, setAllServiceProviders] = useState([]);
@@ -119,7 +122,10 @@ const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders
         }, 3000);
       }
       
-      setLocationLoading(false);
+      // Set loading to false with a slight delay to ensure map is initialized
+      setTimeout(() => {
+        setLocationLoading(false);
+      }, 500);
     };
 
     // Function to update position and emit if needed
@@ -138,6 +144,11 @@ const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders
         };
         
         setCurrentPosition(newPosition);
+        
+        // Set loading to false with a slight delay to ensure map is initialized
+        setTimeout(() => {
+          setLocationLoading(false);
+        }, 500);
 
         // If user is a service provider, emit location update
         if (user?.role === 'serviceProvider' && socket) {
@@ -145,6 +156,11 @@ const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders
             userId: user._id,
             location: newPosition
           });
+        }
+        
+        // Notify parent component of position update if callback provided
+        if (onPositionUpdate) {
+          onPositionUpdate(newPosition);
         }
       } catch (err) {
         console.error("Error processing position:", err);
@@ -216,39 +232,57 @@ const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders
   // Update all service providers from props
   useEffect(() => {
     if (serviceProviders && serviceProviders.length > 0) {
+      console.log("Setting service providers in LiveTracking:", serviceProviders);
       setAllServiceProviders(serviceProviders);
     }
   }, [serviceProviders]);
+  
+  // Debug log when allServiceProviders changes
+  useEffect(() => {
+    console.log("Current allServiceProviders state:", allServiceProviders);
+  }, [allServiceProviders]);
 
   // Listen for service provider location updates
   useEffect(() => {
     if (!socket || !user || user?.role === 'serviceProvider') return;
 
     const handleLocationUpdate = (data) => {
-      // Update booked service provider position
-      if (bookingDetails && data.userId === bookingDetails.providerId) {
-        console.log('Provider location update received:', data.location);
-        setServiceProviderPosition({
-          lat: data.location.lat,
-          lng: data.location.lng
+      try {
+        // Validate location data
+        if (!data || !data.location || typeof data.location.lat !== 'number' || typeof data.location.lng !== 'number') {
+          console.warn('Invalid location data received:', data);
+          return;
+        }
+
+        // Update booked service provider position
+        if (bookingDetails && data.userId === bookingDetails.providerId) {
+          console.log('Provider location update received:', data.location);
+          setServiceProviderPosition({
+            lat: data.location.lat,
+            lng: data.location.lng
+          });
+        }
+        
+        // Update all service providers' positions
+        setAllServiceProviders(prev => {
+          if (!Array.isArray(prev)) return [];
+          
+          return prev.map(provider => {
+            if (provider && provider.id === data.userId) {
+              return {
+                ...provider,
+                realTimeLocation: {
+                  lat: data.location.lat,
+                  lng: data.location.lng
+                }
+              };
+            }
+            return provider;
+          });
         });
+      } catch (err) {
+        console.error('Error handling location update:', err);
       }
-      
-      // Update all service providers' positions
-      setAllServiceProviders(prev => {
-        return prev.map(provider => {
-          if (provider.id === data.userId) {
-            return {
-              ...provider,
-              realTimeLocation: {
-                lat: data.location.lat,
-                lng: data.location.lng
-              }
-            };
-          }
-          return provider;
-        });
-      });
     };
 
     socket.on('location-update', handleLocationUpdate);
@@ -296,17 +330,30 @@ const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders
     fetchRoute();
   }, [showDirections, serviceProviderPosition, currentPosition]);
 
-  if (locationLoading) {
-    return <div className="flex items-center justify-center h-full">Loading map...</div>;
-  }
+  // We'll show a loading indicator but still render the map container
+  // This helps with initialization issues
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full relative">
+      {locationLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading map...</p>
+          </div>
+        </div>
+      )}
       <MapContainer 
         center={[currentPosition.lat, currentPosition.lng]} 
         zoom={mapZoom} 
         style={{ height: '100%', width: '100%' }}
         ref={mapRef}
+        whenCreated={(map) => {
+          // Force map to invalidate size after creation
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 250);
+        }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -345,28 +392,61 @@ const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders
           </Marker>
         )}
 
-        {/* All available service providers (only in idle state) */}
-        {user?.role !== 'serviceProvider' && !bookingDetails && allServiceProviders.map(provider => {
-          // Use real-time location if available, otherwise use static position
-          const position = provider.realTimeLocation ? 
-            [provider.realTimeLocation.lat, provider.realTimeLocation.lng] : 
-            [defaultCenter.lat + (Math.random() * 0.01), defaultCenter.lng + (Math.random() * 0.01)];
-          
-          return (
-            <Marker 
-              key={provider.id}
-              position={position}
-              icon={provider.id === selectedProviderId ? 
-                new L.Icon({
-                  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                  shadowUrl: iconShadow,
-                  iconSize: [25, 41],
-                  iconAnchor: [12, 41],
-                  popupAnchor: [1, -34],
-                  shadowSize: [41, 41]
-                }) : 
-                providerIcon
-              }
+        {/* All available service providers (shown when user is not a service provider) */}
+        {user?.role !== 'serviceProvider' && allServiceProviders && allServiceProviders.length > 0 && allServiceProviders.map(provider => {
+          try {
+            if (!provider) {
+              console.log('Null provider data');
+              return null;
+            }
+            
+            // Safely determine position with fallbacks to prevent crashes
+            let position;
+            
+            if (provider.realTimeLocation && 
+                typeof provider.realTimeLocation.lat === 'number' && 
+                typeof provider.realTimeLocation.lng === 'number') {
+              // Use real-time location if available and valid
+              position = [
+                provider.realTimeLocation.lat, 
+                provider.realTimeLocation.lng
+              ];
+            } else if (provider.position && 
+                      typeof provider.position.x === 'number' && 
+                      typeof provider.position.y === 'number') {
+              // Fall back to position coordinates if available
+              position = [
+                defaultCenter.lat + (provider.position.x / 1000), 
+                defaultCenter.lng + (provider.position.y / 1000)
+              ];
+            } else {
+              // Last resort: use default center with a small random offset
+              const randomOffset = (Math.random() - 0.5) * 0.01;
+              position = [
+                defaultCenter.lat + randomOffset, 
+                defaultCenter.lng + randomOffset
+              ];
+            }
+            
+            // Log each provider being rendered to help with debugging
+            console.log(`Rendering provider ${provider.name} at position:`, position);
+            
+            return (
+              <Marker 
+                key={provider.id}
+                position={position}
+                icon={provider.id === selectedProviderId ? 
+                  new L.Icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                    shadowUrl: shadowUrl,
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                  }) : 
+                  providerIcon
+                }
+              
               eventHandlers={{
                 click: () => {
                   setSelectedProviderId(provider.id);
@@ -396,6 +476,10 @@ const LiveTracking = ({ bookingDetails, showDirections = false, serviceProviders
               </Popup>
             </Marker>
           );
+          } catch (err) {
+            console.error(`Error rendering provider marker:`, err);
+            return null;
+          }
         })}
         
         {/* Show route line if directions are enabled and route exists */}
@@ -417,7 +501,8 @@ LiveTracking.propTypes = {
   bookingDetails: PropTypes.object,
   showDirections: PropTypes.bool,
   serviceProviders: PropTypes.array,
-  onProviderSelect: PropTypes.func
+  onProviderSelect: PropTypes.func,
+  onPositionUpdate: PropTypes.func
 };
 
 export default LiveTracking;

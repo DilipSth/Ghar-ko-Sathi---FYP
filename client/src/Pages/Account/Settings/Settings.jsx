@@ -57,6 +57,10 @@ const Settings = () => {
       if (response.data.success) {
         const fetchedUser = response.data.user;
 
+        // Ensure services is a string, not an array or object
+        const services = fetchedUser.services ? 
+          (typeof fetchedUser.services === 'string' ? fetchedUser.services : '') : '';
+
         setUserData({
           name: fetchedUser.name || "",
           email: fetchedUser.email || "",
@@ -66,7 +70,7 @@ const Settings = () => {
             : "",
           gender: fetchedUser.gender || "",
           role: fetchedUser.role || "",
-          services: fetchedUser.services || "",
+          services: services,
           question: fetchedUser.question || "",
           profileImage: fetchedUser.profileImage || "",
         });
@@ -285,7 +289,7 @@ const Settings = () => {
                     </label>
                     <select
                       name="gender"
-                      value={userData.gender}
+                      value={userData.gender || ""}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -328,7 +332,7 @@ const Settings = () => {
                       </label>
                       <select
                         name="services"
-                        value={userData.services}
+                        value={userData.services || ""}
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >

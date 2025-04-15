@@ -11,10 +11,12 @@ const UserMaps = () => {
   const [serviceProviders, setServiceProviders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [description, setDescription] = useState("");
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [currentPosition, setCurrentPosition] = useState({ lat: 27.7172, lng: 85.3238 });
   const mapContainerRef = useRef(null);
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
@@ -22,51 +24,69 @@ const UserMaps = () => {
   useEffect(() => {
     if (!socket) return;
     
+    // Handle booking accepted by service provider
     socket.on("bookingAccepted", (booking) => {
+      console.log('Booking accepted:', booking);
       setBookingState("accepted");
       setBookingDetails(booking);
     });
 
+    // Handle booking declined by service provider
     socket.on("bookingDeclined", (data) => {
+      console.log('Booking declined:', data);
       setBookingState("idle");
       setBookingDetails(null);
-      alert(data.message);
+      setError(data.message || 'Booking was declined by the service provider');
     });
 
+    // Handle booking errors
     socket.on("bookingError", (data) => {
+      console.error('Booking error:', data);
       setBookingState("idle");
       setBookingDetails(null);
-      alert(data.message);
+      setError(data.message || 'An error occurred with your booking');
     });
 
+    // Handle booking confirmed by user
     socket.on("bookingConfirmedByUser", (booking) => {
+      console.log('Booking confirmed by user:', booking);
       setBookingState("confirmed");
       setBookingDetails(booking);
     });
 
+    // Handle job started by service provider
     socket.on("jobStarted", (booking) => {
+      console.log('Job started:', booking);
       setBookingState("ongoing");
       setBookingDetails(booking);
     });
 
+    // Handle job completed by service provider
     socket.on("providerCompletedJob", (booking) => {
+      console.log('Provider completed job:', booking);
       setBookingState("provider-completed");
       setBookingDetails(booking);
     });
 
+    // Handle job completed by both parties
     socket.on("jobCompleted", (booking) => {
+      console.log('Job completed:', booking);
       setBookingState("completed");
       setBookingDetails(booking);
     });
 
+    // Handle payment success
     socket.on("paymentSuccess", (data) => {
+      console.log('Payment success:', data);
       setBookingState("paid");
-      alert(data.message);
+      setSuccessMessage(data.message || 'Payment successful');
     });
 
+    // Handle review submitted
     socket.on("reviewSubmitted", (data) => {
+      console.log('Review submitted:', data);
       setBookingState("reviewed");
-      alert(data.message);
+      setSuccessMessage(data.message || 'Review submitted successfully');
     });
 
     return () => {
@@ -87,16 +107,28 @@ const UserMaps = () => {
       if (response.data.success) {
         const providers = response.data.serviceProviders.map(
           (provider, index) => {
-            const randomX = 20 + ((index * 15) % 60);
-            const randomY = 25 + ((index * 10) % 50);
+            // Generate realistic coordinates around Kathmandu for service providers
+            // Base coordinates for Kathmandu
+            const baseLatitude = 27.7172;
+            const baseLongitude = 85.3240;
+            
+            // Create a small random offset (approximately within 5km)
+            const latOffset = (Math.random() - 0.5) * 0.05;
+            const lngOffset = (Math.random() - 0.5) * 0.05;
+            
             return {
               id: provider._id,
               name: provider.name,
               phone: provider.phoneNo || "N/A",
-              services:
-                provider.services.map((s) => s.ser_name).join(", ") ||
-                "General Services",
-              position: { x: randomX, y: randomY },
+              services: Array.isArray(provider.services) 
+                ? provider.services.map(s => typeof s === 'object' ? s.ser_name : s).join(", ")
+                : typeof provider.services === 'string' ? provider.services : "General Services",
+              // Add proper map coordinates for the provider
+              realTimeLocation: {
+                lat: baseLatitude + latOffset,
+                lng: baseLongitude + lngOffset
+              },
+              position: { x: 20 + ((index * 15) % 60), y: 25 + ((index * 10) % 50) },
               hourlyRate: 200,
               image: provider.profileImage
                 ? `http://localhost:8000/public/registerImage/${provider.profileImage}`
@@ -108,8 +140,10 @@ const UserMaps = () => {
           }
         );
         setServiceProviders(providers);
+        console.log("Loaded service providers:", providers);
       }
     } catch (err) {
+      console.error("Error fetching service providers:", err);
       setError(
         err.response?.data?.error || "Failed to fetch service providers"
       );
@@ -136,19 +170,42 @@ const UserMaps = () => {
 
   const handleBooking = () => {
     if (selectedProvider && description) {
-      setBookingState("waiting");
-      const bookingData = {
-        userId: user._id,
-        providerId: selectedProvider.id,
-        service: selectedProvider.services, // Send the string of services
-        issue: "Repair Needed",
-        address: "123 Example St, Kathmandu",
-        description,
-      };
-      socket.emit("sendBookingRequest", bookingData);
-      setBookingDetails(bookingData);
+      try {
+        setBookingState("waiting");
+        
+        // Create a booking data object with all necessary information
+        const bookingData = {
+          userId: user._id,
+          providerId: selectedProvider.id,
+          service: selectedProvider.services, // Send the string of services
+          issue: "Repair Needed",
+          address: "123 Example St, Kathmandu",
+          description,
+          // Include location information for better tracking
+          userLocation: {
+            lat: currentPosition.lat,
+            lng: currentPosition.lng
+          },
+          providerLocation: selectedProvider.realTimeLocation || null
+        };
+
+        console.log('Sending booking request:', bookingData);
+
+        if (socket) {
+          socket.emit("sendBookingRequest", bookingData);
+          setBookingDetails(bookingData);
+        } else {
+          console.error('Socket not available for booking request');
+          setError('Connection error. Please try again.');
+          setBookingState("idle");
+        }
+      } catch (err) {
+        console.error('Error sending booking request:', err);
+        setError('Failed to send booking request. Please try again.');
+        setBookingState("idle");
+      }
     } else {
-      alert("Please enter a problem description.");
+      setError('Please select a service provider and provide a description');
     }
   };
 
@@ -244,8 +301,31 @@ const UserMaps = () => {
             </div>
           </div>
         )}
-        {!loading && !error && (
+        {!loading && (
           <div className="flex flex-col flex-grow">
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 relative">
+                <p>{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="absolute top-0 right-0 p-2 text-red-700 hover:text-red-900"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            
+            {successMessage && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 relative">
+                <p>{successMessage}</p>
+                <button
+                  onClick={() => setSuccessMessage(null)}
+                  className="absolute top-0 right-0 p-2 text-green-700 hover:text-green-900"
+                >
+                  ×
+                </button>
+              </div>
+            )}
             <div
               ref={mapContainerRef}
               className="h-2/3 rounded overflow-hidden mb-4"
@@ -255,10 +335,62 @@ const UserMaps = () => {
                 showDirections={bookingState === "ongoing"} 
                 serviceProviders={filteredProviders}
                 onProviderSelect={handleProviderSelect}
+                onPositionUpdate={(position) => setCurrentPosition(position)}
               />
             </div>
             <div className="h-1/3 overflow-y-auto relative">
-              {/* Service provider markers are now handled by LiveTracking */}
+              {/* List of active service providers */}
+              {bookingState === "idle" && !selectedProvider && (
+                <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+                  <h3 className="text-lg font-medium text-gray-800 mb-3">Available Service Providers</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredProviders
+                      .filter(provider => provider.status === "Active")
+                      .map(provider => (
+                        <div 
+                          key={provider.id} 
+                          className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => handleProviderSelect(provider)}
+                        >
+                          <div className="flex items-center mb-2">
+                            <img 
+                              src={provider.image} 
+                              alt={provider.name} 
+                              className="w-12 h-12 rounded-full mr-3 object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = "https://via.placeholder.com/50";
+                              }}
+                            />
+                            <div>
+                              <h4 className="font-semibold">{provider.name}</h4>
+                              <div className="flex items-center text-sm text-yellow-500">
+                                <span className="mr-1">{provider.rating}</span>
+                                <span>★</span>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-1"><span className="font-medium">Services:</span> {provider.services}</p>
+                          <p className="text-sm text-gray-600 mb-2"><span className="font-medium">Jobs:</span> {provider.completedJobs}</p>
+                          <button 
+                            className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-sm transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleProviderSelect(provider);
+                            }}
+                          >
+                            Book Now
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                  {filteredProviders.filter(provider => provider.status === "Active").length === 0 && (
+                    <p className="text-center text-gray-500 py-4">No active service providers available at the moment.</p>
+                  )}
+                </div>
+              )}
+              
+              {/* Selected service provider booking panel */}
               {selectedProvider && bookingState === "idle" && (
                 <div
                   className="absolute bg-white rounded-lg shadow-lg p-4"
