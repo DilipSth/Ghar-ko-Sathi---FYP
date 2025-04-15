@@ -17,6 +17,9 @@ const UserMaps = () => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [currentPosition, setCurrentPosition] = useState({ lat: 27.7172, lng: 85.3238 });
+  const [providerEta, setProviderEta] = useState(null);
+  const [providerDistance, setProviderDistance] = useState(null);
+  const [providerLocation, setProviderLocation] = useState(null);
   const mapContainerRef = useRef(null);
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
@@ -89,8 +92,27 @@ const UserMaps = () => {
       setSuccessMessage(data.message || 'Review submitted successfully');
     });
 
+    // Handle service provider location updates
+    socket.on("location-update", (data) => {
+      console.log('Location update:', data);
+      if (data && data.location) {
+        setProviderLocation(data.location);
+        
+        // Update ETA if provided
+        if (data.eta) {
+          setProviderEta(data.eta);
+        }
+        
+        // Update distance if provided
+        if (data.distance) {
+          setProviderDistance(data.distance);
+        }
+      }
+    });
+
     return () => {
       // Socket disconnection is handled by SocketProvider
+      socket.off("location-update");
     };
   }, [user, socket]);
 
@@ -680,6 +702,22 @@ const UserMaps = () => {
                         <span className="font-semibold">Phone:</span>{" "}
                         {bookingDetails.details.providerPhone}
                       </p>
+                      
+                      {/* ETA Information */}
+                      {providerEta && (
+                        <div className="bg-blue-50 p-3 rounded-lg mt-3">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-sm font-medium">Service provider is on the way</p>
+                              {providerDistance && <p className="text-xs text-gray-600">Distance: {providerDistance} km</p>}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-blue-600">{providerEta} min</p>
+                              <p className="text-xs text-gray-600">Estimated arrival time</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-3">
                       <button
@@ -731,6 +769,22 @@ const UserMaps = () => {
                         <span className="font-semibold">Phone:</span>{" "}
                         {bookingDetails.details.providerPhone}
                       </p>
+                      
+                      {/* ETA Information */}
+                      {providerEta && (
+                        <div className="bg-blue-50 p-3 rounded-lg mt-3">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-sm font-medium">Service provider is on the way</p>
+                              {providerDistance && <p className="text-xs text-gray-600">Distance: {providerDistance} km</p>}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-blue-600">{providerEta} min</p>
+                              <p className="text-xs text-gray-600">Estimated arrival time</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

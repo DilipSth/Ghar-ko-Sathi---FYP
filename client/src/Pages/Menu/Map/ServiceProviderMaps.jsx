@@ -1,7 +1,8 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useCallback } from 'react';
 import { useAuth } from '../../../context/authContext';
 import { SocketContext } from '../../../context/SocketContext';
 import LiveTracking from '../../../Components/LiveTracking';
+import axios from 'axios';
 
 const ServiceProviderMap = () => {
   const [activeTab, setActiveTab] = useState('available');
@@ -13,8 +14,33 @@ const ServiceProviderMap = () => {
   const [locationName, setLocationName] = useState('');
   const [currentPosition, setCurrentPosition] = useState(null);
   const [userPhone, setUserPhone] = useState('');
+  const [userPosition, setUserPosition] = useState(null);
+  const [routeToUser, setRouteToUser] = useState([]);
+  const [eta, setEta] = useState(null);
+  const [distance, setDistance] = useState(null);
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
+
+  // Calculate distance between two points in kilometers
+  const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return (R * c).toFixed(1);
+  }, []);
+
+  // Calculate ETA based on distance
+  const calculateETA = useCallback((distanceInKm) => {
+    // Assuming average speed of 30 km/h in city traffic
+    return Math.ceil(distanceInKm * (60 / 30)); // Minutes
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -87,6 +113,25 @@ const ServiceProviderMap = () => {
 
   const acceptRequest = () => {
     if (currentRequest && socket) {
+      // Extract user position from the request
+      if (currentRequest.userLocation) {
+        setUserPosition(currentRequest.userLocation);
+        
+        // Calculate distance and ETA
+        if (currentPosition) {
+          const dist = calculateDistance(
+            currentPosition.lat, currentPosition.lng,
+            currentRequest.userLocation.lat, currentRequest.userLocation.lng
+          );
+          setDistance(dist);
+          setEta(calculateETA(dist));
+        }
+      }
+      
+      // Calculate route to user
+      calculateRouteToUser();
+      
+      // Accept the booking
       socket.emit("acceptBooking", { bookingId: currentRequest.bookingId });
       setPendingRequests(pendingRequests.filter(req => req.bookingId !== currentRequest.bookingId));
     }
@@ -142,6 +187,71 @@ const ServiceProviderMap = () => {
       getLocationName();
     }
   }, [currentPosition]);
+
+  // Calculate route to user
+  const calculateRouteToUser = async () => {
+    if (!currentPosition || !currentRequest?.userLocation) return;
+    
+    try {
+      // Use OSRM for route calculation
+      const response = await axios.get(
+        `https://router.project-osrm.org/route/v1/driving/${currentPosition.lng},${currentPosition.lat};${currentRequest.userLocation.lng},${currentRequest.userLocation.lat}?overview=full&geometries=geojson`
+      );
+      
+      const data = response.data;
+      
+      if (data.routes && data.routes.length > 0) {
+        // Extract coordinates from the route
+        const coordinates = data.routes[0].geometry.coordinates.map(coord => ({
+          lat: coord[1],
+          lng: coord[0]
+        }));
+        
+        setRouteToUser(coordinates);
+        
+        // Calculate distance and ETA based on route
+        if (data.routes[0].distance) {
+          const distanceInKm = (data.routes[0].distance / 1000).toFixed(1);
+          setDistance(distanceInKm);
+          
+          // Estimate time: average speed 30 km/h in city traffic
+          const estimatedMinutes = calculateETA(distanceInKm);
+          setEta(estimatedMinutes);
+        }
+      }
+    } catch (error) {
+      console.error("Error calculating route:", error);
+      // Fallback to direct line if route calculation fails
+      if (currentPosition && currentRequest?.userLocation) {
+        setRouteToUser([currentPosition, currentRequest.userLocation]);
+      }
+    }
+  };
+
+  // Update route when position changes
+  useEffect(() => {
+    if (bookingState === 'accepted' || bookingState === 'confirmed' || bookingState === 'ongoing') {
+      calculateRouteToUser();
+    }
+  }, [currentPosition, bookingState]);
+
+  // Send position updates to user
+  useEffect(() => {
+    if (!socket || !currentPosition || bookingState === 'idle') return;
+    
+    const intervalId = setInterval(() => {
+      if (currentRequest?.bookingId) {
+        socket.emit('location-update', {
+          userId: user.id,
+          bookingId: currentRequest.bookingId,
+          location: currentPosition,
+          eta: eta
+        });
+      }
+    }, 5000); // Update every 5 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [socket, currentPosition, currentRequest, bookingState, user, eta]);
 
   return (
     <div className="p-4 h-full">
@@ -300,6 +410,33 @@ const ServiceProviderMap = () => {
                   <p className="text-sm"><span className="font-semibold">Phone:</span> {currentRequest.userPhone}</p>
                   <p className="text-sm"><span className="font-semibold">Location:</span> {currentRequest.userLocationName}</p>
                 </div>
+                
+                <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
+                  <LiveTracking 
+                    bookingDetails={{
+                      ...currentRequest,
+                      userLocation: currentRequest.userLocation,
+                      providerId: user.id
+                    }} 
+                    showDirections={true} 
+                    onPositionUpdate={handlePositionUpdate}
+                  />
+                </div>
+                
+                {distance && eta && (
+                  <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-medium">Distance to user</p>
+                        <p className="text-lg font-bold">{distance} km</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">Estimated arrival</p>
+                        <p className="text-lg font-bold">{eta} minutes</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -316,6 +453,34 @@ const ServiceProviderMap = () => {
                     <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
                   )}
                 </div>
+                
+                <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
+                  <LiveTracking 
+                    bookingDetails={{
+                      ...currentRequest,
+                      userLocation: currentRequest.userLocation,
+                      providerId: user.id
+                    }} 
+                    showDirections={true} 
+                    onPositionUpdate={handlePositionUpdate}
+                  />
+                </div>
+                
+                {distance && eta && (
+                  <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-medium">Distance to user</p>
+                        <p className="text-lg font-bold">{distance} km</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">Estimated arrival</p>
+                        <p className="text-lg font-bold">{eta} minutes</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <button onClick={startJob} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Start Job</button>
               </div>
             </div>
@@ -332,8 +497,32 @@ const ServiceProviderMap = () => {
                   <p className="text-sm"><span className="font-semibold">Description:</span> {currentRequest.details.description}</p>
                 </div>
                 <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
-                  <LiveTracking bookingDetails={currentRequest} showDirections={true} />
+                  <LiveTracking 
+                    bookingDetails={{
+                      ...currentRequest,
+                      userLocation: currentRequest.userLocation,
+                      providerId: user.id
+                    }} 
+                    showDirections={true}
+                    onPositionUpdate={handlePositionUpdate} 
+                  />
                 </div>
+                
+                {distance && eta && (
+                  <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-medium">Distance to user</p>
+                        <p className="text-lg font-bold">{distance} km</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">Estimated arrival</p>
+                        <p className="text-lg font-bold">{eta} minutes</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <button onClick={completeJob} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
