@@ -55,36 +55,37 @@ const ServiceProviderMap = () => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("newBookingRequest", (booking) => {
+    // Create a stable reference to the event handlers
+    const handleNewBookingRequest = (booking) => {
       setPendingRequests((prev) => [...prev, booking]);
-    });
+    };
 
-    socket.on("bookingConfirmed", (booking) => {
+    const handleBookingConfirmed = (booking) => {
       setBookingState('accepted');
       setCurrentRequest(booking);
-    });
+    };
 
-    socket.on("bookingConfirmedByUser", (booking) => {
+    const handleBookingConfirmedByUser = (booking) => {
       setBookingState('confirmed');
       setCurrentRequest(booking);
-    });
+    };
 
-    socket.on("problemDescriptionReceived", (booking) => {
+    const handleProblemDescriptionReceived = (booking) => {
       setBookingState('confirmed');
       setCurrentRequest(booking);
-    });
+    };
 
-    socket.on("jobStartedSuccess", (booking) => {
+    const handleJobStartedSuccess = (booking) => {
       setBookingState('ongoing');
       setCurrentRequest(booking);
-    });
+    };
 
-    socket.on("userCompletedJob", (booking) => {
+    const handleUserCompletedJob = (booking) => {
       setBookingState('user-completed');
       setCurrentRequest(booking);
-    });
+    };
 
-    socket.on("jobCompleted", (booking) => {
+    const handleJobCompleted = (booking) => {
       setBookingState('completed');
       setCurrentRequest(booking);
       setServiceHistory((prev) => [
@@ -100,17 +101,35 @@ const ServiceProviderMap = () => {
         },
         ...prev,
       ]);
-    });
+    };
 
-    socket.on("reviewReceived", (booking) => {
+    const handleReviewReceived = (booking) => {
       setBookingState('reviewed');
       setCurrentRequest(booking);
-    });
+    };
+
+    // Register all event listeners
+    socket.on("newBookingRequest", handleNewBookingRequest);
+    socket.on("bookingConfirmed", handleBookingConfirmed);
+    socket.on("bookingConfirmedByUser", handleBookingConfirmedByUser);
+    socket.on("problemDescriptionReceived", handleProblemDescriptionReceived);
+    socket.on("jobStartedSuccess", handleJobStartedSuccess);
+    socket.on("userCompletedJob", handleUserCompletedJob);
+    socket.on("jobCompleted", handleJobCompleted);
+    socket.on("reviewReceived", handleReviewReceived);
 
     return () => {
-      // Socket disconnection is handled by SocketProvider
+      // Clean up all event listeners
+      socket.off("newBookingRequest", handleNewBookingRequest);
+      socket.off("bookingConfirmed", handleBookingConfirmed);
+      socket.off("bookingConfirmedByUser", handleBookingConfirmedByUser);
+      socket.off("problemDescriptionReceived", handleProblemDescriptionReceived);
+      socket.off("jobStartedSuccess", handleJobStartedSuccess);
+      socket.off("userCompletedJob", handleUserCompletedJob);
+      socket.off("jobCompleted", handleJobCompleted);
+      socket.off("reviewReceived", handleReviewReceived);
     };
-  }, [user, socket]);
+  }, [socket]); // Only depend on socket, not user
 
   const toggleAvailability = () => {
     setIsAvailable(!isAvailable);
@@ -187,38 +206,41 @@ const ServiceProviderMap = () => {
     localStorage.setItem('serviceProviderPosition', JSON.stringify(position));
   };
 
+  // Separate useEffect for location name to prevent infinite loops
   useEffect(() => {
-    if (currentPosition) {
-      const getLocationName = async () => {
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentPosition.lat}&lon=${currentPosition.lng}`
-          );
-          const data = await response.json();
-          setLocationName(data.display_name || `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
-        } catch (error) {
-          setLocationName(`${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
-        }
-      };
+    if (!currentPosition) return;
+    
+    const getLocationName = async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentPosition.lat}&lon=${currentPosition.lng}`
+        );
+        const data = await response.json();
+        setLocationName(data.display_name || `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
+      } catch (error) {
+        setLocationName(`${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
+      }
+    };
 
-      getLocationName();
-    }
+    // Use a debounce mechanism to prevent too many API calls
+    const timeoutId = setTimeout(getLocationName, 1000);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [currentPosition]);
 
-  // Calculate route to user
-  const calculateRouteToUser = async () => {
-    if (!currentPosition || !currentRequest?.userLocation) return;
+  // Separate useEffect for route calculation to prevent infinite loops
+  const calculateRouteToUser = useCallback(async () => {
+    if (!currentPosition || !userPosition) return;
     
     try {
-      // Use OSRM for route calculation
-      const response = await axios.get(
-        `https://router.project-osrm.org/route/v1/driving/${currentPosition.lng},${currentPosition.lat};${currentRequest.userLocation.lng},${currentRequest.userLocation.lat}?overview=full&geometries=geojson`
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${currentPosition.lng},${currentPosition.lat};${userPosition.lng},${userPosition.lat}?overview=full&geometries=geojson`
       );
-      
-      const data = response.data;
+      const data = await response.json();
       
       if (data.routes && data.routes.length > 0) {
-        // Extract coordinates from the route
         const coordinates = data.routes[0].geometry.coordinates.map(coord => ({
           lat: coord[1],
           lng: coord[0]
@@ -226,24 +248,32 @@ const ServiceProviderMap = () => {
         
         setRouteToUser(coordinates);
         
-        // Calculate distance and ETA based on route
-        if (data.routes[0].distance) {
-          const distanceInKm = (data.routes[0].distance / 1000).toFixed(1);
-          setDistance(distanceInKm);
-          
-          // Estimate time: average speed 30 km/h in city traffic
-          const estimatedMinutes = calculateETA(distanceInKm);
-          setEta(estimatedMinutes);
-        }
+        // Update distance and ETA based on the route
+        const distanceInKm = (data.routes[0].distance / 1000).toFixed(1);
+        setDistance(distanceInKm);
+        setEta(calculateETA(distanceInKm));
       }
     } catch (error) {
       console.error("Error calculating route:", error);
       // Fallback to direct line if route calculation fails
-      if (currentPosition && currentRequest?.userLocation) {
-        setRouteToUser([currentPosition, currentRequest.userLocation]);
-      }
+      setRouteToUser([currentPosition, userPosition]);
+      
+      // Calculate straight-line distance as fallback
+      const dist = calculateDistance(
+        currentPosition.lat, currentPosition.lng,
+        userPosition.lat, userPosition.lng
+      );
+      setDistance(dist);
+      setEta(calculateETA(dist));
     }
-  };
+  }, [currentPosition, userPosition, calculateDistance, calculateETA]);
+
+  // Call route calculation when positions change
+  useEffect(() => {
+    if (bookingState === 'accepted' || bookingState === 'confirmed') {
+      calculateRouteToUser();
+    }
+  }, [bookingState, calculateRouteToUser]);
 
   // Function to handle maintenance details submission
   const handleMaintenanceSubmit = () => {

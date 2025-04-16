@@ -233,6 +233,26 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
       // Extract coordinates with additional data
       const { latitude, longitude, accuracy, heading, speed } = position.coords;
       
+      // Validate coordinates (some devices may return invalid values)
+      if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude) ||
+          latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        console.error("Invalid coordinates received:", latitude, longitude);
+        // Try to use last known valid position
+        const lastPosition = localStorage.getItem('userCurrentPosition');
+        if (lastPosition) {
+          try {
+            const parsedPosition = JSON.parse(lastPosition);
+            console.log("Using last known valid position:", parsedPosition);
+            setCurrentPosition(parsedPosition);
+            setLocationLoading(false);
+            return;
+          } catch (e) {
+            console.error("Error parsing last position:", e);
+          }
+        }
+        return;
+      }
+      
       // Create new position object with enhanced data
       const newPosition = {
         lat: latitude,
@@ -243,7 +263,34 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
         timestamp: new Date().getTime()
       };
       
-      console.log("Position updated:", newPosition);
+      // Check if position has actually changed significantly (to avoid unnecessary updates)
+      const lastPosition = localStorage.getItem('userCurrentPosition');
+      let hasChanged = true;
+      
+      if (lastPosition) {
+        try {
+          const parsedLastPosition = JSON.parse(lastPosition);
+          const distance = calculateDistance(
+            parsedLastPosition.lat, parsedLastPosition.lng,
+            latitude, longitude
+          );
+          
+          // Only consider it changed if moved more than 10 meters
+          hasChanged = distance > 0.01; // 0.01 km = 10 meters
+          
+          if (!hasChanged) {
+            console.log("Position hasn't changed significantly, skipping update");
+            // Still update the timestamp to keep it fresh
+            parsedLastPosition.timestamp = new Date().getTime();
+            localStorage.setItem('userCurrentPosition', JSON.stringify(parsedLastPosition));
+            return;
+          }
+        } catch (e) {
+          console.error("Error comparing with last position:", e);
+        }
+      }
+      
+      console.log("Real-time position updated:", newPosition);
       
       // Update state with new position
       setCurrentPosition(newPosition);
@@ -267,24 +314,55 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
         localStorage.setItem('serviceProviderPosition', JSON.stringify(newPosition));
       }
       
+      // Update last update time for UI
+      setLastUpdateTime(new Date().toLocaleTimeString());
+      
       // Call the callback if provided
       if (onPositionUpdate) {
         onPositionUpdate(newPosition);
       }
     } catch (error) {
       console.error("Error updating position:", error);
-      // Use default center as fallback
+      // Try to use last known position before falling back to default
+      const lastPosition = localStorage.getItem('userCurrentPosition');
+      if (lastPosition) {
+        try {
+          const parsedPosition = JSON.parse(lastPosition);
+          console.log("Using last known position after error:", parsedPosition);
+          setCurrentPosition(parsedPosition);
+          setLocationLoading(false);
+          return;
+        } catch (e) {
+          console.error("Error parsing last position:", e);
+        }
+      }
+      
+      // Use default center as last resort fallback
       setCurrentPosition(defaultCenter);
       setLocationLoading(false);
     }
-  }, [user, socket, onPositionUpdate, defaultCenter]);
+  }, [user, socket, onPositionUpdate, defaultCenter, calculateDistance]);
 
   // Function to handle geolocation errors with fallback
-  const handleGeolocationError = useCallback(() => {
-    console.log("Handling geolocation error, using fallback position");
-    // Use default position as fallback
+  const handleGeolocationError = useCallback((error) => {
+    console.log("Handling geolocation error, using fallback position", error?.message || 'Unknown error');
+    // Try to get stored position first before falling back to default
+    const storedPosition = localStorage.getItem('userCurrentPosition');
+    if (storedPosition) {
+      try {
+        const parsedPosition = JSON.parse(storedPosition);
+        console.log("Using stored position as fallback:", parsedPosition);
+        setCurrentPosition(parsedPosition);
+        setLocationLoading(false);
+        return true; // Successfully used stored position
+      } catch (e) {
+        console.error("Error parsing stored position:", e);
+      }
+    }
+    // If no stored position or parsing failed, use default center
     setCurrentPosition(defaultCenter);
     setLocationLoading(false);
+    return false; // Had to use default position
   }, [defaultCenter]);
 
   // Get current position on component mount
@@ -294,13 +372,22 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
     if (storedPosition) {
       try {
         const parsedPosition = JSON.parse(storedPosition);
-        console.log("Using stored position:", parsedPosition);
-        setCurrentPosition(parsedPosition);
-        setLocationLoading(false);
+        // Check if stored position is recent (within last 5 minutes)
+        const now = new Date().getTime();
+        const positionTime = parsedPosition.timestamp || 0;
+        const isRecent = (now - positionTime) < 5 * 60 * 1000; // 5 minutes
         
-        // If callback provided, call it with stored position
-        if (onPositionUpdate) {
-          onPositionUpdate(parsedPosition);
+        if (isRecent) {
+          console.log("Using recent stored position:", parsedPosition);
+          setCurrentPosition(parsedPosition);
+          setLocationLoading(false);
+          
+          // If callback provided, call it with stored position
+          if (onPositionUpdate) {
+            onPositionUpdate(parsedPosition);
+          }
+        } else {
+          console.log("Stored position is too old, will get fresh position");
         }
       } catch (e) {
         console.error("Error parsing stored position:", e);
@@ -334,9 +421,32 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
     };
 
     // Local function to handle geolocation errors with fallback
-    const localHandleGeolocationError = () => {
-      // Use default position as fallback and start simulation
+    const localHandleGeolocationError = (error) => {
+      // Try to use stored position first
+      const storedPosition = localStorage.getItem('userCurrentPosition');
+      if (storedPosition) {
+        try {
+          const parsedPosition = JSON.parse(storedPosition);
+          console.log("Using stored position after error:", parsedPosition);
+          setCurrentPosition(parsedPosition);
+          setLocationLoading(false);
+          
+          // If we have a stored position, don't start simulation yet
+          // Instead, retry geolocation after a short delay
+          setTimeout(() => {
+            console.log("Retrying geolocation after using stored position");
+            setupGeolocation();
+          }, 5000);
+          
+          return;
+        } catch (e) {
+          console.error("Error parsing stored position:", e);
+        }
+      }
+      
+      // If no stored position or parsing failed, start simulation
       if (!usingSimulatedLocation) {
+        console.log("Starting location simulation due to error:", error?.message || 'Unknown error');
         usingSimulatedLocation = true;
         setCurrentPosition(defaultCenter);
         startLocationSimulation();
@@ -368,31 +478,49 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
                   watchIdRef.current = navigator.geolocation.watchPosition(
                     updatePosition,
                     (error) => {
-                      console.error("Geolocation error:", error.message);
-                      localHandleGeolocationError();
+                      console.error("Geolocation watch error:", error.message, error.code);
+                      
+                      // For TIMEOUT errors, try to use last known position and retry
+                      if (error.code === error.TIMEOUT) {
+                        const lastPosition = localStorage.getItem('userCurrentPosition');
+                        if (lastPosition) {
+                          try {
+                            const parsedPosition = JSON.parse(lastPosition);
+                            console.log("Using last known position after timeout:", parsedPosition);
+                            setCurrentPosition(parsedPosition);
+                          } catch (e) {
+                            console.error("Error parsing last position:", e);
+                          }
+                        }
+                        // Continue watching - don't invoke error handler
+                        return;
+                      }
+                      
+                      // For other errors, use the error handler
+                      localHandleGeolocationError(error);
                     },
                     {
                       enableHighAccuracy: true,
-                      maximumAge: 0, // Always get fresh position
-                      timeout: 10000 // Longer timeout for better accuracy
+                      maximumAge: 10000, // Allow positions up to 10 seconds old
+                      timeout: 15000 // Longer timeout for better accuracy
                     }
                   );
                   
                   console.log("Started watching position with ID:", watchIdRef.current);
                 } catch (error) {
                   console.error("Error setting up geolocation watch:", error);
-                  localHandleGeolocationError();
+                  localHandleGeolocationError(error);
                 }
               }
             },
             (error) => {
-              console.error("Error getting initial position:", error.message);
-              localHandleGeolocationError();
+              console.error("Error getting initial position:", error.message, error.code);
+              localHandleGeolocationError(error);
             },
             { 
               enableHighAccuracy: true, 
-              timeout: 15000, // Longer initial timeout
-              maximumAge: 0 // Always get fresh position
+              timeout: 20000, // Extended timeout for initial position
+              maximumAge: 30000 // Allow positions up to 30 seconds old for initial position
             }
           );
         } catch (error) {
@@ -435,7 +563,11 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
   
   // Listen for service provider location updates
   useEffect(() => {
-    if (!socket || !user || user?.role === 'serviceProvider') return;
+    if (!socket || !user) return;
+    
+    // Only users should listen for service provider updates
+    // Service providers should not listen for their own updates
+    if (user?.role === 'serviceProvider') return;
 
     const handleLocationUpdate = (data) => {
       try {
@@ -484,7 +616,11 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
 
   // Listen for service provider location updates with animation
   useEffect(() => {
-    if (!socket || !user || user?.role === 'serviceProvider') return;
+    if (!socket || !user) return;
+    
+    // Only users should listen for service provider updates with animation
+    // Service providers should not listen for their own updates
+    if (user?.role === 'serviceProvider') return;
     
     const handleLocationUpdate = (data) => {
       if (data && data.location && bookingDetails?.details?.providerId === data.userId) {
@@ -757,6 +893,9 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
 
   // Calculate route when service provider accepts the booking or when positions change
   useEffect(() => {
+    // Only calculate routes for users, not service providers
+    if (user?.role === 'serviceProvider') return;
+    
     if (!showDirections && !bookingAccepted) return;
     if (!currentPosition || !serviceProviderPosition) return;
     
@@ -805,7 +944,7 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
     };
 
     fetchRoute();
-  }, [showDirections, bookingAccepted, serviceProviderPosition, currentPosition]);
+  }, [showDirections, bookingAccepted, serviceProviderPosition, currentPosition, user]);
 
   // Add a new effect to handle socket reconnection
   useEffect(() => {
@@ -920,7 +1059,7 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
       <NotificationCenter />
       {showAcceptModal && <AcceptBookingModal />}
       
-      {/* Tracking status bar */}
+      {/* Tracking status bar - only show to users, not service providers */}
       {user?.role !== 'serviceProvider' && serviceProviderPosition && (
         <div className="fixed top-4 left-0 right-0 mx-auto max-w-md z-50 bg-white p-3 rounded-lg shadow-lg">
           <div className="flex items-center justify-between">
@@ -996,7 +1135,7 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
             </Popup>
           </Marker>
           
-          {/* Previous positions trail for service provider */}
+          {/* Previous positions trail for service provider - only shown to users */}
           {user?.role !== 'serviceProvider' && previousPositions.map((pos, index) => (
             <Marker 
               key={`history-${index}`}
@@ -1031,10 +1170,8 @@ const LiveTracking = ({ bookingDetails, showDirections: initialShowDirections = 
             </Marker>
           )}
           
-          {/* All available service providers - REMOVED as per user request */}
-          
-          {/* Show route line if directions are enabled and route exists */}
-          {(showDirections || bookingAccepted) && routePath.length > 0 && (
+          {/* Show route line if directions are enabled and route exists - only for users */}
+          {user?.role !== 'serviceProvider' && (showDirections || bookingAccepted) && routePath.length > 0 && (
             <Polyline 
               positions={routePath.map(point => [point.lat, point.lng])}
               color="#0066CC"
