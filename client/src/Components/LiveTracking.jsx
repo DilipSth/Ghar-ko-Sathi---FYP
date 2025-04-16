@@ -82,13 +82,19 @@ const LiveTracking = ({
   serviceProviders = [],
   onPositionUpdate = null,
   setBookingDetails,
+  bookingState, // New prop to track booking status
 }) => {
-  const [currentPosition, setCurrentPosition] = useState(defaultCenter);
-  const [serviceProviderPosition, setServiceProviderPosition] = useState(null);
+  const [currentPosition, setCurrentPosition] = useState(() => {
+    const stored = localStorage.getItem("userCurrentPosition");
+    return stored ? JSON.parse(stored) : defaultCenter;
+  });
+  const [serviceProviderPosition, setServiceProviderPosition] = useState(() => {
+    const stored = localStorage.getItem("activeServiceProviderLocation");
+    return stored ? JSON.parse(stored) : null;
+  });
   const [routePath, setRoutePath] = useState([]);
-  const [locationLoading, setLocationLoading] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [showDirections, setShowDirections] = useState(initialShowDirections);
-  const [bookingId] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [eta, setEta] = useState(null);
@@ -98,6 +104,7 @@ const LiveTracking = ({
   const [trackingStatus, setTrackingStatus] = useState("idle");
   const [previousPositions, setPreviousPositions] = useState([]);
   const [bookingAccepted, setBookingAccepted] = useState(false);
+  const [forceLocationUpdate, setForceLocationUpdate] = useState(false); // Trigger real-time update
 
   const markerRef = useRef(null);
   const routeFetchTimeoutRef = useRef(null);
@@ -105,7 +112,11 @@ const LiveTracking = ({
   const lastReconnectAttemptRef = useRef(0);
   const retryCountRef = useRef(0);
   const lastProviderPositionRef = useRef(null);
-  const hasProcessedStoredPositionRef = useRef(false); // Track if stored position was processed
+  const hasProcessedStoredPositionRef = useRef(true); // Start as true to prevent initial fetch
+
+  const { socket } = useContext(SocketContext) || {};
+  const { user } = useAuth() || {};
+  const mapRef = useRef(null);
 
   const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
     const R = 6371;
@@ -156,6 +167,416 @@ const LiveTracking = ({
       ))}
     </div>
   );
+
+  const [userLocationName, setUserLocationName] = useState("");
+  const [providerLocationName, setProviderLocationName] = useState("");
+
+  const locationNameCache = useRef({});
+
+  const mockLocationData = useMemo(
+    () => ({
+      "27.7172,85.3238": "Kathmandu, Nepal",
+      "27.6933,85.3424": "Patan, Lalitpur, Nepal",
+      "27.6710,85.4298": "Bhaktapur, Nepal",
+      "27.7030,85.3143": "Kirtipur, Nepal",
+      "27.7500,85.3500": "Budhanilkantha, Nepal",
+    }),
+    []
+  );
+
+  const getLocationName = useCallback(
+    async (lat, lng) => {
+      const cacheKey = `${parseFloat(lat).toFixed(4)},${parseFloat(lng).toFixed(
+        4
+      )}`;
+
+      if (locationNameCache.current[cacheKey]) {
+        return locationNameCache.current[cacheKey];
+      }
+
+      for (const [mockCoords, mockName] of Object.entries(mockLocationData)) {
+        const [mockLat, mockLng] = mockCoords.split(",").map(Number);
+        if (Math.abs(mockLat - lat) < 0.01 && Math.abs(mockLng - lng) < 0.01) {
+          locationNameCache.current[cacheKey] = mockName;
+          return mockName;
+        }
+      }
+
+      let fallbackName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+      if (lat > 27.6 && lat < 27.8 && lng > 85.2 && lng < 85.5) {
+        fallbackName += " (Kathmandu Valley)";
+      }
+
+      locationNameCache.current[cacheKey] = fallbackName;
+      return fallbackName;
+    },
+    [mockLocationData]
+  );
+
+  const updatePosition = useCallback(
+    (position) => {
+      try {
+        const { latitude, longitude, accuracy, heading, speed } =
+          position.coords;
+
+        if (
+          !latitude ||
+          !longitude ||
+          isNaN(latitude) ||
+          isNaN(longitude) ||
+          latitude < -90 ||
+          latitude > 90 ||
+          longitude < -180 ||
+          longitude > 180
+        ) {
+          console.warn("Invalid coordinates received:", latitude, longitude);
+          return;
+        }
+
+        const newPosition = {
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy,
+          heading: heading || 0,
+          speed: speed || 0,
+          timestamp: new Date().getTime(),
+        };
+
+        const lastPosition = localStorage.getItem("userCurrentPosition");
+        let hasChanged = true;
+
+        if (lastPosition) {
+          try {
+            const parsedLastPosition = JSON.parse(lastPosition);
+            const distance = calculateDistance(
+              parsedLastPosition.lat,
+              parsedLastPosition.lng,
+              latitude,
+              longitude
+            );
+
+            hasChanged = distance > 0.01;
+
+            if (!hasChanged) {
+              console.log(
+                "Position hasn't changed significantly, skipping update"
+              );
+              return;
+            }
+          } catch (e) {
+            console.error("Error comparing with last position:", e);
+          }
+        }
+
+        console.log("Real-time position updated:", newPosition);
+
+        setCurrentPosition(newPosition);
+
+        localStorage.setItem(
+          "userCurrentPosition",
+          JSON.stringify(newPosition)
+        );
+
+        setLocationLoading(false);
+
+        if (user?.role === "serviceProvider" && socket && socket.connected) {
+          console.log("Emitting location update to server");
+          socket.emit("update-location", {
+            userId: user._id,
+            location: newPosition,
+            timestamp: new Date().getTime(),
+          });
+
+          localStorage.setItem(
+            "serviceProviderPosition",
+            JSON.stringify(newPosition)
+          );
+        }
+
+        setLastUpdateTime(new Date().toLocaleTimeString());
+
+        if (onPositionUpdate) {
+          onPositionUpdate(newPosition);
+        }
+
+        retryCountRef.current = 0;
+      } catch (error) {
+        console.error("Error updating position:", error);
+      }
+    },
+    [user, socket, onPositionUpdate, calculateDistance]
+  );
+
+  const handleGeolocationError = useCallback((error) => {
+    console.warn("Geolocation error:", error.message);
+    setLocationLoading(false);
+  }, []);
+
+  // Trigger real-time location update after booking confirmation
+  useEffect(() => {
+    if (
+      bookingState === "accepted" ||
+      bookingState === "confirmed" ||
+      bookingState === "ongoing"
+    ) {
+      setForceLocationUpdate(true);
+    }
+  }, [bookingState]);
+
+  // Handle geolocation
+  useEffect(() => {
+    let isActive = true;
+
+    const attemptGeolocation = () => {
+      if (!navigator.geolocation || !isActive) return;
+
+      setLocationLoading(true);
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (!isActive) return;
+          updatePosition(position);
+          watchIdRef.current = navigator.geolocation.watchPosition(
+            updatePosition,
+            handleGeolocationError,
+            {
+              enableHighAccuracy: true,
+              maximumAge: 10000,
+              timeout: 15000,
+            }
+          );
+        },
+        handleGeolocationError,
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 30000,
+        }
+      );
+    };
+
+    if (forceLocationUpdate) {
+      attemptGeolocation();
+      setForceLocationUpdate(false); // Reset trigger
+    }
+
+    return () => {
+      isActive = false;
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [forceLocationUpdate, updatePosition, handleGeolocationError]);
+
+  // Update location names
+  useEffect(() => {
+    let isMounted = true;
+
+    const updateLocationNames = async () => {
+      if (currentPosition) {
+        try {
+          const name = await getLocationName(
+            currentPosition.lat,
+            currentPosition.lng
+          );
+          if (isMounted && name !== userLocationName) {
+            setUserLocationName(name);
+          }
+        } catch (error) {
+          console.error("Error getting user location name:", error);
+        }
+      }
+
+      if (serviceProviderPosition) {
+        try {
+          const name = await getLocationName(
+            serviceProviderPosition.lat,
+            serviceProviderPosition.lng
+          );
+          if (isMounted && name !== providerLocationName) {
+            setProviderLocationName(name);
+          }
+        } catch (error) {
+          console.error("Error getting provider location name:", error);
+        }
+      }
+    };
+
+    const timeoutId = setTimeout(updateLocationNames, 1000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [
+    currentPosition,
+    serviceProviderPosition,
+    getLocationName,
+    userLocationName,
+    providerLocationName,
+  ]);
+
+  // Handle service provider location updates
+  useEffect(() => {
+    if (!socket || !user || user?.role === "serviceProvider") return;
+
+    const handleLocationUpdate = (data) => {
+      try {
+        if (
+          !data ||
+          !data.location ||
+          typeof data.location.lat !== "number" ||
+          typeof data.location.lng !== "number"
+        ) {
+          return;
+        }
+
+        if (
+          bookingDetails?.providerId &&
+          data.userId === bookingDetails.providerId
+        ) {
+          const newPosition = {
+            lat: data.location.lat,
+            lng: data.location.lng,
+          };
+
+          if (lastProviderPositionRef.current) {
+            const distance = calculateDistance(
+              lastProviderPositionRef.current.lat,
+              lastProviderPositionRef.current.lng,
+              newPosition.lat,
+              newPosition.lng
+            );
+            if (distance < 0.01) {
+              return;
+            }
+          }
+
+          setServiceProviderPosition(newPosition);
+          lastProviderPositionRef.current = newPosition;
+          localStorage.setItem(
+            "activeServiceProviderLocation",
+            JSON.stringify(newPosition)
+          );
+        }
+      } catch (error) {
+        console.error("Error handling location update:", error);
+      }
+    };
+
+    socket.on("location-update", handleLocationUpdate);
+
+    return () => {
+      socket.off("location-update", handleLocationUpdate);
+    };
+  }, [socket, user, bookingDetails?.providerId, calculateDistance]);
+
+  // Fetch route after booking
+  useEffect(() => {
+    if (
+      !showDirections &&
+      !bookingAccepted &&
+      bookingState !== "confirmed" &&
+      bookingState !== "ongoing"
+    )
+      return;
+    if (!currentPosition || !serviceProviderPosition) return;
+
+    const fetchRoute = async () => {
+      try {
+        const response = await axios.get(
+          `https://router.project-osrm.org/route/v1/driving/${currentPosition.lng},${currentPosition.lat};${serviceProviderPosition.lng},${serviceProviderPosition.lat}?overview=full&geometries=geojson`
+        );
+
+        const data = response.data;
+
+        if (data.routes && data.routes.length > 0) {
+          const coordinates = data.routes[0].geometry.coordinates.map(
+            (coord) => ({
+              lat: coord[1],
+              lng: coord[0],
+            })
+          );
+
+          setRoutePath(coordinates);
+
+          if (data.routes[0].distance) {
+            const distanceInKm = (data.routes[0].distance / 1000).toFixed(1);
+            setDistance(distanceInKm);
+
+            const estimatedMinutes = Math.ceil(
+              (data.routes[0].distance / 1000) * (60 / 30)
+            );
+            setEta(estimatedMinutes);
+          }
+
+          if (coordinates.length > 0 && mapRef.current) {
+            const bounds = L.latLngBounds(
+              coordinates.map((coord) => [coord.lat, coord.lng])
+            );
+            mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching route:", error);
+        setRoutePath([currentPosition, serviceProviderPosition]);
+      }
+    };
+
+    if (routeFetchTimeoutRef.current) {
+      clearTimeout(routeFetchTimeoutRef.current);
+    }
+    routeFetchTimeoutRef.current = setTimeout(fetchRoute, 3000);
+
+    return () => {
+      if (routeFetchTimeoutRef.current) {
+        clearTimeout(routeFetchTimeoutRef.current);
+      }
+    };
+  }, [
+    showDirections,
+    bookingAccepted,
+    serviceProviderPosition,
+    currentPosition,
+    user,
+    bookingState,
+  ]);
+
+  const EnhancedPopup = ({ title, location, distance, extraInfo }) => (
+    <div className="min-w-[200px]">
+      <h3 className="font-bold text-lg mb-1">{title}</h3>
+      {location && <p className="text-sm text-gray-600 mb-1">{location}</p>}
+      {distance && <p className="text-sm">Distance: {distance} km</p>}
+      {extraInfo && <div className="mt-2">{extraInfo}</div>}
+    </div>
+  );
+
+  EnhancedPopup.propTypes = {
+    title: PropTypes.string.isRequired,
+    location: PropTypes.string,
+    distance: PropTypes.string,
+    extraInfo: PropTypes.node,
+  };
+
+  EnhancedPopup.defaultProps = {
+    location: "",
+    distance: "",
+    extraInfo: null,
+  };
+
+  const handleBookingAccept = () => {
+    setShowAcceptModal(false);
+    socket.emit("booking-accepted", {
+      bookingId: bookingDetails._id,
+      serviceProviderId: user._id,
+    });
+    setBookingAccepted(true);
+    setShowDirections(true);
+    setForceLocationUpdate(true); // Trigger real-time update
+    addNotification("Booking accepted successfully!", "success");
+  };
 
   const AcceptBookingModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -267,611 +688,17 @@ const LiveTracking = ({
     </div>
   );
 
-  const { socket } = useContext(SocketContext) || {};
-  const { user } = useAuth() || {};
-  const mapRef = useRef(null);
-
-  const updatePosition = useCallback(
-    (position) => {
-      try {
-        const { latitude, longitude, accuracy, heading, speed } =
-          position.coords;
-
-        if (
-          !latitude ||
-          !longitude ||
-          isNaN(latitude) ||
-          isNaN(longitude) ||
-          latitude < -90 ||
-          latitude > 90 ||
-          longitude < -180 ||
-          longitude > 180
-        ) {
-          console.warn("Invalid coordinates received:", latitude, longitude);
-          const lastPosition = localStorage.getItem("userCurrentPosition");
-          if (lastPosition) {
-            try {
-              const parsedPosition = JSON.parse(lastPosition);
-              console.log("Using last known valid position:", parsedPosition);
-              setCurrentPosition(parsedPosition);
-              setLocationLoading(false);
-              return;
-            } catch (e) {
-              console.error("Error parsing last position:", e);
-            }
-          }
-          return;
-        }
-
-        const newPosition = {
-          lat: latitude,
-          lng: longitude,
-          accuracy: accuracy,
-          heading: heading || 0,
-          speed: speed || 0,
-          timestamp: new Date().getTime(),
-        };
-
-        const lastPosition = localStorage.getItem("userCurrentPosition");
-        let hasChanged = true;
-
-        if (lastPosition) {
-          try {
-            const parsedLastPosition = JSON.parse(lastPosition);
-            const distance = calculateDistance(
-              parsedLastPosition.lat,
-              parsedLastPosition.lng,
-              latitude,
-              longitude
-            );
-
-            hasChanged = distance > 0.01;
-
-            if (!hasChanged) {
-              console.log(
-                "Position hasn't changed significantly, skipping update"
-              );
-              parsedLastPosition.timestamp = new Date().getTime();
-              localStorage.setItem(
-                "userCurrentPosition",
-                JSON.stringify(parsedLastPosition)
-              );
-              return;
-            }
-          } catch (e) {
-            console.error("Error comparing with last position:", e);
-          }
-        }
-
-        console.log("Real-time position updated:", newPosition);
-
-        setCurrentPosition(newPosition);
-
-        localStorage.setItem(
-          "userCurrentPosition",
-          JSON.stringify(newPosition)
-        );
-
-        setLocationLoading(false);
-
-        if (user?.role === "serviceProvider" && socket && socket.connected) {
-          console.log("Emitting location update to server");
-          socket.emit("update-location", {
-            userId: user._id,
-            location: newPosition,
-            timestamp: new Date().getTime(),
-          });
-
-          localStorage.setItem(
-            "serviceProviderPosition",
-            JSON.stringify(newPosition)
-          );
-        }
-
-        setLastUpdateTime(new Date().toLocaleTimeString());
-
-        if (onPositionUpdate) {
-          onPositionUpdate(newPosition);
-        }
-
-        retryCountRef.current = 0;
-      } catch (error) {
-        console.error("Error updating position:", error);
-        const lastPosition = localStorage.getItem("userCurrentPosition");
-        if (lastPosition) {
-          try {
-            const parsedPosition = JSON.parse(lastPosition);
-            console.log(
-              "Using last known position after error:",
-              parsedPosition
-            );
-            setCurrentPosition(parsedPosition);
-            setLocationLoading(false);
-            return;
-          } catch (e) {
-            console.error("Error parsing last position:", e);
-          }
-        }
-
-        setCurrentPosition(defaultCenter);
-        setLocationLoading(false);
-      }
-    },
-    [user, socket, onPositionUpdate, calculateDistance]
-  );
-
-  const handleGeolocationError = useCallback((error) => {
-    console.warn("Geolocation error:", error.message);
-    const storedPosition = localStorage.getItem("userCurrentPosition");
-    if (storedPosition) {
-      try {
-        const parsedPosition = JSON.parse(storedPosition);
-        console.log("Using stored position as fallback:", parsedPosition);
-        setCurrentPosition(parsedPosition);
-        setLocationLoading(false);
-        return true;
-      } catch (e) {
-        console.error("Error parsing stored position:", e);
-      }
-    }
-
-    setCurrentPosition(defaultCenter);
-    setLocationLoading(false);
-    return false;
-  }, []);
-
-  useEffect(() => {
-    let isActive = true;
-    const maxRetries = 3;
-    const retryDelay = 5000;
-
-    const tryStoredPosition = () => {
-      if (hasProcessedStoredPositionRef.current) {
-        console.log("Stored position already processed, skipping");
-        return false;
-      }
-
-      const storedPosition = localStorage.getItem("userCurrentPosition");
-      if (storedPosition && isActive) {
-        try {
-          const parsedPosition = JSON.parse(storedPosition);
-          const now = new Date().getTime();
-          const positionTime = parsedPosition.timestamp || 0;
-          const isRecent = now - positionTime < 5 * 60 * 1000;
-
-          if (isRecent) {
-            // Only update if significantly different from currentPosition
-            const distance = calculateDistance(
-              currentPosition.lat,
-              currentPosition.lng,
-              parsedPosition.lat,
-              parsedPosition.lng
-            );
-            if (distance > 0.01) {
-              console.log("Updating position from stored:", parsedPosition);
-              setCurrentPosition(parsedPosition);
-              setLocationLoading(false);
-              if (onPositionUpdate) {
-                onPositionUpdate(parsedPosition);
-              }
-            } else {
-              console.log("Stored position is too similar, skipping update");
-            }
-            hasProcessedStoredPositionRef.current = true;
-            return true;
-          }
-        } catch (e) {
-          console.error("Error parsing stored position:", e);
-        }
-      }
-      return false;
-    };
-
-    const attemptGeolocationWithRetries = (attempt = 0) => {
-      if (!isActive || attempt > maxRetries) {
-        handleGeolocationError(new Error("Max geolocation retries reached"));
-        return;
-      }
-
-      if (
-        !tryStoredPosition() &&
-        !watchIdRef.current &&
-        navigator.geolocation &&
-        isActive
-      ) {
-        setLocationLoading(true);
-
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            if (!isActive) return;
-
-            const { latitude, longitude, accuracy, heading, speed } =
-              position.coords;
-            const newPosition = {
-              lat: latitude,
-              lng: longitude,
-              accuracy,
-              heading: heading || 0,
-              speed: speed || 0,
-              timestamp: new Date().getTime(),
-            };
-
-            const lastPosition = localStorage.getItem("userCurrentPosition");
-            let shouldUpdate = true;
-            if (lastPosition) {
-              try {
-                const parsedLastPosition = JSON.parse(lastPosition);
-                const distance = calculateDistance(
-                  parsedLastPosition.lat,
-                  parsedLastPosition.lng,
-                  latitude,
-                  longitude
-                );
-                shouldUpdate = distance > 0.01;
-              } catch (e) {
-                console.error("Error parsing last position:", e);
-              }
-            }
-
-            if (shouldUpdate) {
-              setCurrentPosition(newPosition);
-              localStorage.setItem(
-                "userCurrentPosition",
-                JSON.stringify(newPosition)
-              );
-              if (onPositionUpdate) {
-                onPositionUpdate(newPosition);
-              }
-            }
-
-            setLocationLoading(false);
-            retryCountRef.current = 0;
-
-            watchIdRef.current = navigator.geolocation.watchPosition(
-              (pos) => {
-                if (!isActive) return;
-                updatePosition(pos);
-              },
-              (error) => {
-                if (!isActive) return;
-                console.warn("Geolocation watch error:", error.message);
-                handleGeolocationError(error);
-              },
-              {
-                enableHighAccuracy: true,
-                maximumAge: 10000,
-                timeout: 15000,
-              }
-            );
-          },
-          (error) => {
-            if (!isActive) return;
-            console.warn("Error getting initial position:", error.message);
-            retryCountRef.current = attempt + 1;
-            if (attempt < maxRetries) {
-              console.log(`Retrying geolocation in ${retryDelay}ms...`);
-              setTimeout(
-                () => attemptGeolocationWithRetries(attempt + 1),
-                retryDelay
-              );
-            } else {
-              handleGeolocationError(error);
-            }
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 30000,
-          }
-        );
-      }
-    };
-
-    attemptGeolocationWithRetries();
-
-    return () => {
-      isActive = false;
-      if (watchIdRef.current) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      hasProcessedStoredPositionRef.current = false; // Reset for next mount
-    };
-  }, [
-    user?.role,
-    socket?.connected,
-    calculateDistance,
-    onPositionUpdate,
-    user?._id,
-    socket,
-    handleGeolocationError,
-    currentPosition,
-  ]);
-
-  useEffect(() => {
-    if (!socket || !user || user?.role === "serviceProvider") return;
-
-    const handleLocationUpdate = (data) => {
-      try {
-        if (
-          !data ||
-          !data.location ||
-          typeof data.location.lat !== "number" ||
-          typeof data.location.lng !== "number"
-        ) {
-          return;
-        }
-
-        if (
-          bookingDetails?.providerId &&
-          data.userId === bookingDetails.providerId
-        ) {
-          const newPosition = {
-            lat: data.location.lat,
-            lng: data.location.lng,
-          };
-
-          if (lastProviderPositionRef.current) {
-            const distance = calculateDistance(
-              lastProviderPositionRef.current.lat,
-              lastProviderPositionRef.current.lng,
-              newPosition.lat,
-              newPosition.lng
-            );
-            if (distance < 0.01) {
-              console.log(
-                "Provider position hasn't changed significantly, skipping update"
-              );
-              return;
-            }
-          }
-
-          setServiceProviderPosition(newPosition);
-          lastProviderPositionRef.current = newPosition;
-          localStorage.setItem(
-            "activeServiceProviderLocation",
-            JSON.stringify(newPosition)
-          );
-        }
-
-        if (onPositionUpdate) {
-          onPositionUpdate(data);
-        }
-      } catch (error) {
-        console.error("Error handling location update:", error);
-      }
-    };
-
-    socket.on("location-update", handleLocationUpdate);
-
-    return () => {
-      socket.off("location-update", handleLocationUpdate);
-    };
-  }, [
-    socket,
-    user,
-    bookingDetails?.providerId,
-    onPositionUpdate,
-    calculateDistance,
-  ]);
-
-  useEffect(() => {
-    if (!serviceProviderPosition || !user || user?.role === "serviceProvider")
-      return;
-
-    const lastPosition = JSON.parse(
-      localStorage.getItem("lastServiceProviderPosition") || "null"
-    );
-    if (lastPosition) {
-      const distance = calculateDistance(
-        lastPosition.lat,
-        lastPosition.lng,
-        serviceProviderPosition.lat,
-        serviceProviderPosition.lng
-      );
-
-      if (distance > 0.01) {
-        setIsMoving(true);
-        localStorage.setItem(
-          "lastServiceProviderPosition",
-          JSON.stringify(serviceProviderPosition)
-        );
-
-        setPreviousPositions((prev) => {
-          const newPositions = [serviceProviderPosition, ...prev].slice(0, 5);
-          return newPositions;
-        });
-      } else {
-        setIsMoving(false);
-        return;
-      }
-    } else {
-      localStorage.setItem(
-        "lastServiceProviderPosition",
-        JSON.stringify(serviceProviderPosition)
-      );
-    }
-
-    setLastUpdateTime(new Date().getTime());
-  }, [serviceProviderPosition, user, calculateDistance]);
-
-  useEffect(() => {
-    if (!bookingDetails) return;
-
-    const storedProviderLocation = localStorage.getItem(
-      "activeServiceProviderLocation"
-    );
-    if (storedProviderLocation) {
-      try {
-        const parsedPosition = JSON.parse(storedProviderLocation);
-        console.log("Using stored service provider position:", parsedPosition);
-        if (
-          !serviceProviderPosition ||
-          parsedPosition.lat !== serviceProviderPosition.lat ||
-          parsedPosition.lng !== serviceProviderPosition.lng
-        ) {
-          setServiceProviderPosition(parsedPosition);
-          lastProviderPositionRef.current = parsedPosition;
-        }
-      } catch (e) {
-        console.error("Error parsing stored service provider position:", e);
-      }
-    }
-  }, [bookingDetails, serviceProviderPosition]);
-
-  const [userLocationName, setUserLocationName] = useState("");
-  const [providerLocationName, setProviderLocationName] = useState("");
-
-  const locationNameCache = useRef({});
-
-  const mockLocationData = useMemo(
-    () => ({
-      "27.7172,85.3238": "Kathmandu, Nepal",
-      "27.6933,85.3424": "Patan, Lalitpur, Nepal",
-      "27.6710,85.4298": "Bhaktapur, Nepal",
-      "27.7030,85.3143": "Kirtipur, Nepal",
-      "27.7500,85.3500": "Budhanilkantha, Nepal",
-    }),
-    []
-  );
-
-  const getLocationName = useCallback(
-    async (lat, lng) => {
-      const cacheKey = `${parseFloat(lat).toFixed(4)},${parseFloat(lng).toFixed(
-        4
-      )}`;
-
-      if (locationNameCache.current[cacheKey]) {
-        return locationNameCache.current[cacheKey];
-      }
-
-      for (const [mockCoords, mockName] of Object.entries(mockLocationData)) {
-        const [mockLat, mockLng] = mockCoords.split(",").map(Number);
-        if (Math.abs(mockLat - lat) < 0.01 && Math.abs(mockLng - lng) < 0.01) {
-          locationNameCache.current[cacheKey] = mockName;
-          return mockName;
-        }
-      }
-
-      let fallbackName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-      if (lat > 27.6 && lat < 27.8 && lng > 85.2 && lng < 85.5) {
-        fallbackName += " (Kathmandu Valley)";
-      }
-
-      locationNameCache.current[cacheKey] = fallbackName;
-      return fallbackName;
-    },
-    [mockLocationData]
-  );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const updateLocationNames = async () => {
-      if (currentPosition) {
-        try {
-          const name = await getLocationName(
-            currentPosition.lat,
-            currentPosition.lng
-          );
-          if (isMounted && name !== userLocationName) {
-            setUserLocationName(name);
-          }
-        } catch (error) {
-          console.error("Error getting user location name:", error);
-          if (isMounted && !userLocationName) {
-            setUserLocationName(
-              `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(
-                4
-              )}`
-            );
-          }
-        }
-      }
-
-      if (serviceProviderPosition) {
-        try {
-          const name = await getLocationName(
-            serviceProviderPosition.lat,
-            serviceProviderPosition.lng
-          );
-          if (isMounted && name !== providerLocationName) {
-            setProviderLocationName(name);
-          }
-        } catch (error) {
-          console.error("Error getting provider location name:", error);
-          if (isMounted && !providerLocationName) {
-            setProviderLocationName(
-              `${serviceProviderPosition.lat.toFixed(
-                4
-              )}, ${serviceProviderPosition.lng.toFixed(4)}`
-            );
-          }
-        }
-      }
-    };
-
-    const timeoutId = setTimeout(updateLocationNames, 1000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, [
-    currentPosition,
-    serviceProviderPosition,
-    getLocationName,
-    userLocationName,
-    providerLocationName,
-  ]);
-
-  const EnhancedPopup = ({ title, location, distance, extraInfo }) => (
-    <div className="min-w-[200px]">
-      <h3 className="font-bold text-lg mb-1">{title}</h3>
-      {location && <p className="text-sm text-gray-600 mb-1">{location}</p>}
-      {distance && <p className="text-sm">Distance: {distance} km</p>}
-      {extraInfo && <div className="mt-2">{extraInfo}</div>}
-    </div>
-  );
-
-  EnhancedPopup.propTypes = {
-    title: PropTypes.string.isRequired,
-    location: PropTypes.string,
-    distance: PropTypes.string,
-    extraInfo: PropTypes.node,
-  };
-
-  EnhancedPopup.defaultProps = {
-    location: "",
-    distance: "",
-    extraInfo: null,
-  };
-
-  const handleBookingAccept = () => {
-    setShowAcceptModal(false);
-    socket.emit("booking-accepted", {
-      bookingId: bookingDetails._id,
-      serviceProviderId: user._id,
-    });
-    setBookingAccepted(true);
-    setShowDirections(true);
-    addNotification("Booking accepted successfully!", "success");
-  };
-
   useEffect(() => {
     if (!socket) return;
 
     const handleBookingAcceptedByProvider = (data) => {
-      if (data.bookingId === bookingId) {
-        setBookingAccepted(true);
-        setShowDirections(true);
-        setTrackingStatus("active");
-        addNotification(
-          "Your booking has been accepted! Service provider is on the way.",
-          "success"
-        );
-      }
+      setBookingAccepted(true);
+      setShowDirections(true);
+      setTrackingStatus("active");
+      addNotification(
+        "Your booking has been accepted! Service provider is on the way.",
+        "success"
+      );
     };
 
     socket.on("booking-accepted-confirmation", handleBookingAcceptedByProvider);
@@ -882,7 +709,7 @@ const LiveTracking = ({
         handleBookingAcceptedByProvider
       );
     };
-  }, [socket, bookingId]);
+  }, [socket]);
 
   useEffect(() => {
     if (!socket || !user?.isServiceProvider) return;
@@ -899,197 +726,6 @@ const LiveTracking = ({
       socket.off("booking-request");
     };
   }, [socket, user, setBookingDetails]);
-
-  useEffect(() => {
-    if (user?.role === "serviceProvider") return;
-
-    if (!showDirections && !bookingAccepted) return;
-    if (!currentPosition || !serviceProviderPosition) return;
-
-    const fetchRoute = async () => {
-      try {
-        const response = await axios.get(
-          `https://router.project-osrm.org/route/v1/driving/${currentPosition.lng},${currentPosition.lat};${serviceProviderPosition.lng},${serviceProviderPosition.lat}?overview=full&geometries=geojson`
-        );
-
-        const data = response.data;
-
-        if (data.routes && data.routes.length > 0) {
-          const coordinates = data.routes[0].geometry.coordinates.map(
-            (coord) => ({
-              lat: coord[1],
-              lng: coord[0],
-            })
-          );
-
-          setRoutePath(coordinates);
-
-          if (data.routes[0].distance) {
-            const distanceInKm = (data.routes[0].distance / 1000).toFixed(1);
-            setDistance(distanceInKm);
-
-            const estimatedMinutes = Math.ceil(
-              (data.routes[0].distance / 1000) * (60 / 30)
-            );
-            setEta(estimatedMinutes);
-          }
-
-          if (coordinates.length > 0 && mapRef.current) {
-            const bounds = L.latLngBounds(
-              coordinates.map((coord) => [coord.lat, coord.lng])
-            );
-            mapRef.current.fitBounds(bounds, { padding: [50, 50] });
-          }
-        } else {
-          setRoutePath([currentPosition, serviceProviderPosition]);
-        }
-      } catch (error) {
-        console.error("Error fetching route:", error);
-        setRoutePath([currentPosition, serviceProviderPosition]);
-      }
-    };
-
-    if (routeFetchTimeoutRef.current) {
-      clearTimeout(routeFetchTimeoutRef.current);
-    }
-    routeFetchTimeoutRef.current = setTimeout(fetchRoute, 3000);
-
-    return () => {
-      if (routeFetchTimeoutRef.current) {
-        clearTimeout(routeFetchTimeoutRef.current);
-      }
-    };
-  }, [
-    showDirections,
-    bookingAccepted,
-    serviceProviderPosition,
-    currentPosition,
-    user,
-  ]);
-
-  useEffect(() => {
-    if (socket) {
-      const handleReconnect = () => {
-        const now = Date.now();
-        const minReconnectInterval = 10000;
-
-        if (now - lastReconnectAttemptRef.current < minReconnectInterval) {
-          console.log(
-            "Skipping geolocation restart due to recent reconnect attempt"
-          );
-          return;
-        }
-
-        lastReconnectAttemptRef.current = now;
-        console.log("Socket reconnected, restarting position watch");
-
-        if (navigator.geolocation && watchIdRef.current === null) {
-          setLocationLoading(true);
-
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              console.log(
-                "Initial position obtained after reconnect:",
-                position.coords
-              );
-              try {
-                const { latitude, longitude, accuracy, heading, speed } =
-                  position.coords;
-
-                const newPosition = {
-                  lat: latitude,
-                  lng: longitude,
-                  accuracy: accuracy,
-                  heading: heading || 0,
-                  speed: speed || 0,
-                  timestamp: new Date().getTime(),
-                };
-
-                console.log("Position updated after reconnect:", newPosition);
-
-                setCurrentPosition(newPosition);
-                setLocationLoading(false);
-
-                if (
-                  user?.role === "serviceProvider" &&
-                  socket &&
-                  socket.connected
-                ) {
-                  socket.emit("update-location", {
-                    userId: user._id,
-                    location: newPosition,
-                    timestamp: new Date().getTime(),
-                  });
-                }
-
-                if (onPositionUpdate) {
-                  onPositionUpdate(newPosition);
-                }
-              } catch (error) {
-                console.warn(
-                  "Error updating position after reconnect:",
-                  error.message
-                );
-                handleGeolocationError(error);
-              }
-
-              if (navigator.geolocation) {
-                try {
-                  if (watchIdRef.current) {
-                    navigator.geolocation.clearWatch(watchIdRef.current);
-                  }
-
-                  watchIdRef.current = navigator.geolocation.watchPosition(
-                    updatePosition,
-                    (error) => {
-                      console.warn(
-                        "Geolocation error after reconnect:",
-                        error.message
-                      );
-                    },
-                    {
-                      enableHighAccuracy: true,
-                      maximumAge: 0,
-                      timeout: 10000,
-                    }
-                  );
-
-                  console.log(
-                    "Restarted watching position with ID:",
-                    watchIdRef.current
-                  );
-                } catch (error) {
-                  console.warn(
-                    "Error restarting geolocation watch:",
-                    error.message
-                  );
-                  handleGeolocationError(error);
-                }
-              }
-            },
-            (error) => {
-              console.warn(
-                "Error getting initial position after reconnect:",
-                error.message
-              );
-              handleGeolocationError(error);
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: 15000,
-              maximumAge: 0,
-            }
-          );
-        }
-      };
-
-      socket.on("connect", handleReconnect);
-
-      return () => {
-        socket.off("connect", handleReconnect);
-      };
-    }
-  }, [socket, user, onPositionUpdate, updatePosition, handleGeolocationError]);
 
   return (
     <>
@@ -1243,6 +879,7 @@ LiveTracking.propTypes = {
   serviceProviders: PropTypes.array,
   onPositionUpdate: PropTypes.func,
   setBookingDetails: PropTypes.func,
+  bookingState: PropTypes.string, // New prop
 };
 
 export default LiveTracking;
