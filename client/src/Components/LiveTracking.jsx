@@ -722,13 +722,37 @@ const LiveTracking = ({
     };
   }, [socket, user, setBookingDetails]);
 
+  // Ensure map is properly sized when component mounts
+  useEffect(() => {
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current.invalidateSize();
+      }, 300);
+    }
+  }, []);
+
+  // Add window resize handler to invalidate map size
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   return (
-    <>
+    <div className="relative w-full h-full flex flex-col">
       <NotificationCenter />
       {showAcceptModal && <AcceptBookingModal />}
 
       {user?.role !== "serviceProvider" && serviceProviderPosition && (
-        <div className="fixed top-4 left-0 right-0 mx-auto max-w-md z-50 bg-white p-3 rounded-lg shadow-lg">
+        <div className="sticky top-0 z-30 mx-auto w-full max-w-md bg-white p-3 rounded-lg shadow-lg mb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div
@@ -761,35 +785,40 @@ const LiveTracking = ({
         </div>
       )}
 
-      <div className="h-full w-full relative">
+      <div className="relative flex-grow w-full h-full" style={{ minHeight: "300px" }}>
         {locationLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-20">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
               <p className="mt-2 text-gray-600">Loading map...</p>
             </div>
           </div>
         )}
+        
         <MapContainer
-          center={[currentPosition.lat, currentPosition.lng]}
+          center={{ lat: currentPosition?.lat || defaultCenter.lat, lng: currentPosition?.lng || defaultCenter.lng }}
           zoom={15}
-          style={{ height: "100%", width: "100%" }}
-          ref={mapRef}
+          style={{ width: "100%", height: "100%" }}
+          className="z-10 absolute inset-0"
           whenCreated={(map) => {
+            mapRef.current = map;
             setTimeout(() => {
               map.invalidateSize();
             }, 250);
           }}
         >
           <TileLayer
-            attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-
-          <MapUpdater position={currentPosition} zoom={15} />
-
+          
+          <MapUpdater 
+            position={{ lat: currentPosition?.lat || defaultCenter.lat, lng: currentPosition?.lng || defaultCenter.lng }} 
+            zoom={15} 
+          />
+        
           <Marker
-            position={[currentPosition.lat, currentPosition.lng]}
+            position={{ lat: currentPosition.lat, lng: currentPosition.lng }}
             icon={userIcon}
           >
             <Popup>
@@ -815,7 +844,7 @@ const LiveTracking = ({
             previousPositions.map((pos, index) => (
               <Marker
                 key={`history-${index}`}
-                position={[pos.lat, pos.lng]}
+                position={{ lat: pos.lat, lng: pos.lng }}
                 icon={historyIcon}
                 opacity={0.5 - index * 0.1}
               />
@@ -823,10 +852,10 @@ const LiveTracking = ({
 
           {user?.role !== "serviceProvider" && serviceProviderPosition && (
             <Marker
-              position={[
-                serviceProviderPosition.lat,
-                serviceProviderPosition.lng,
-              ]}
+              position={{
+                lat: serviceProviderPosition.lat,
+                lng: serviceProviderPosition.lng,
+              }}
               icon={providerIcon}
               ref={markerRef}
               className={isMoving ? "animated-marker" : ""}
@@ -864,7 +893,7 @@ const LiveTracking = ({
             )}
         </MapContainer>
       </div>
-    </>
+    </div>
   );
 };
 

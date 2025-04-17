@@ -478,11 +478,13 @@ const ServiceProviderMap = () => {
           {bookingState === "idle" && (
             <>
               <div className="h-2/3 w-full rounded overflow-hidden mb-4">
-                <LiveTracking
-                  bookingDetails={currentRequest}
-                  showDirections={bookingState === "ongoing"}
-                  onPositionUpdate={handlePositionUpdate}
-                />
+                <div className="h-full w-full" style={{ minHeight: "400px", maxHeight: "calc(100vh - 300px)" }}>
+                  <LiveTracking
+                    bookingDetails={currentRequest}
+                    showDirections={bookingState === "ongoing"}
+                    onPositionUpdate={handlePositionUpdate}
+                  />
+                </div>
               </div>
               {activeTab === "available" && (
                 <div className="h-1/3 overflow-y-auto">

@@ -388,58 +388,34 @@ const UserMaps = () => {
     <div className="h-screen flex flex-col">
       <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4">
         {/* Map Section */}
-        <div className="flex-1 min-h-[400px] lg:min-h-[600px] bg-white rounded-lg shadow-lg p-4 relative">
-          <div className="h-full rounded-lg overflow-hidden">
-            {loading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
-                <div className="flex flex-col items-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-2"></div>
-                  <p className="text-gray-600">Loading service providers...</p>
+        <div className="flex-1 overflow-hidden bg-white shadow-md rounded-lg">
+          {error && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
+              <p>{error}</p>
+            </div>
+          )}
+          {successMessage && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
+              <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg max-w-md">
+                <div className="flex items-center mb-2">
+                  <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <h3 className="font-semibold">Success</h3>
+                </div>
+                <p className="mb-4">{successMessage}</p>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setSuccessMessage(null)}
+                    className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Dismiss
+                  </button>
                 </div>
               </div>
-            )}
-            {error && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
-                <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg max-w-md">
-                  <div className="flex items-center mb-2">
-                    <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <h3 className="font-semibold">Error</h3>
-                  </div>
-                  <p className="mb-4">{error}</p>
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => setError(null)}
-                      className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {successMessage && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
-                <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg max-w-md">
-                  <div className="flex items-center mb-2">
-                    <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <h3 className="font-semibold">Success</h3>
-                  </div>
-                  <p className="mb-4">{successMessage}</p>
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => setSuccessMessage(null)}
-                      className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
+          )}
+          <div className="h-full w-full" style={{ minHeight: "70vh", maxHeight: "calc(100vh - 100px)" }}>
             <LiveTracking
               bookingDetails={bookingDetails}
               showDirections={bookingState === "ongoing"}
