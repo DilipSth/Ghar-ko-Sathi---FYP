@@ -1,8 +1,9 @@
 import { TbMapStar } from "react-icons/tb";
 import { GiAutoRepair } from "react-icons/gi";
 import { IoSettingsOutline, IoShieldOutline } from "react-icons/io5";
-import { FaUsers } from "react-icons/fa";
+import { FaUsers, FaUserTie } from "react-icons/fa";
 import { IoChatbubbleEllipsesOutline } from "react-icons/io5";
+import { MdPrivacyTip } from "react-icons/md";
 
 const masterItems = [
   {
@@ -30,7 +31,7 @@ const masterItems = [
       {
         to: "/dashboard/menu/serviceProvider",
         label: "Service Provider",
-        icon: <FaUsers className="text-xl" />,
+        icon: <FaUserTie className="text-xl" />,
         allowedRoles: ["admin"]
       },
     ],
@@ -61,12 +62,12 @@ const masterItems = [
       {
         to: "/dashboard/legal/privacy",
         label: "Privacy Policy",
+        icon: <MdPrivacyTip className="text-xl" />,
         allowedRoles: ["admin", "user", "serviceProvider"]
-        // icon: <FcServices className="text-xl"/>,
       },
       {
         to: "/dashboard/contact/chat",
-        label: "Chat",
+        label: "Contact Us",
         icon: <IoChatbubbleEllipsesOutline className="text-xl" />,
         allowedRoles: ["admin", "user", "serviceProvider"]
       },

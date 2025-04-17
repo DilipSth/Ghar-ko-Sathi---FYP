@@ -11,17 +11,13 @@ const Layout = () => {
   };
 
   return (
-    <div className={`flex h-screen overflow-hidden`}>
+    <div className="flex h-screen w-full overflow-hidden">
       <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-      <div
-        className={`relative flex flex-col flex-grow overflow-y-auto overflow-x-hidden bg-gray-100`}
-      >
-        <div className="flex flex-col max-md:pt-0  max-sm:p-0 ">
-          <Header toggleSidebar={toggleSidebar} />
-        </div>
-        <div className="flex-grow overflow-auto bg-[#F3F3F3] ">
+      <div className="flex flex-col flex-1 w-0 min-h-0 overflow-hidden">
+        <Header toggleSidebar={toggleSidebar} />
+        <main className="flex-1 overflow-y-auto bg-[#F3F3F3]">
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   );
