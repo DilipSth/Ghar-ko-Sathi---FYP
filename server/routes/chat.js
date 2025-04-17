@@ -1,5 +1,14 @@
 import express from 'express';
-import { getConversations, createConversation, getMessages, sendMessage } from '../controllers/chatController.js';
+import { 
+  getConversations, 
+  createConversation, 
+  getMessages, 
+  sendMessage,
+  getUnreadCount,
+  markAllAsRead,
+  editMessage,
+  deleteMessage
+} from '../controllers/chatController.js';
 import verifyUser from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -18,5 +27,17 @@ router.get('/messages/:conversationId', getMessages);
 
 // Send a new message
 router.post('/messages', sendMessage);
+
+// Get total unread message count
+router.get('/unread-count', getUnreadCount);
+
+// Mark all messages as read
+router.post('/mark-all-read', markAllAsRead);
+
+// Edit a message
+router.put('/messages/:messageId', editMessage);
+
+// Delete a message
+router.delete('/messages/:messageId', deleteMessage);
 
 export default router; 

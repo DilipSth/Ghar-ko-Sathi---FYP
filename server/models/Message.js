@@ -24,6 +24,10 @@ const messageSchema = new Schema(
     isRead: {
       type: Boolean,
       default: false
+    },
+    edited: {
+      type: Boolean,
+      default: false
     }
   },
   {

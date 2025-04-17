@@ -163,4 +163,174 @@ export const sendMessage = async (req, res) => {
     console.error('Error sending message:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
+};
+
+// Get total unread message count
+export const getUnreadCount = async (req, res) => {
+  try {
+    const { _id, role } = req.user;
+    let totalUnreadCount = 0;
+    
+    // For admins - sum unread counts across all conversations
+    if (role === 'admin') {
+      const result = await Conversation.aggregate([
+        { $group: { _id: null, total: { $sum: "$unreadCount" } } }
+      ]);
+      totalUnreadCount = result.length > 0 ? result[0].total : 0;
+    } 
+    // For users - sum unread counts for their conversations only
+    else if (role === 'user') {
+      const result = await Conversation.aggregate([
+        { $match: { user: _id } },
+        { $group: { _id: null, total: { $sum: "$unreadCount" } } }
+      ]);
+      totalUnreadCount = result.length > 0 ? result[0].total : 0;
+    } 
+    // For service providers - sum unread counts for their conversations only
+    else if (role === 'serviceProvider') {
+      const result = await Conversation.aggregate([
+        { $match: { serviceProvider: _id } },
+        { $group: { _id: null, total: { $sum: "$unreadCount" } } }
+      ]);
+      totalUnreadCount = result.length > 0 ? result[0].total : 0;
+    }
+    
+    res.status(200).json({ success: true, count: totalUnreadCount });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Mark all messages as read
+export const markAllAsRead = async (req, res) => {
+  try {
+    const { _id, role } = req.user;
+    
+    // Find all conversations this user has access to
+    let conversationQuery = {};
+    if (role === 'user') {
+      conversationQuery = { user: _id };
+    } else if (role === 'serviceProvider') {
+      conversationQuery = { serviceProvider: _id };
+    }
+    // Admin has access to all conversations
+    
+    // Get all relevant conversation IDs
+    const conversations = await Conversation.find(conversationQuery).select('_id');
+    const conversationIds = conversations.map(c => c._id);
+    
+    // Mark all relevant messages as read
+    await Message.updateMany(
+      { 
+        conversation: { $in: conversationIds }, 
+        sender: { $ne: _id },
+        isRead: false 
+      },
+      { isRead: true }
+    );
+    
+    // Reset unread counts
+    await Conversation.updateMany(
+      conversationQuery,
+      { unreadCount: 0 }
+    );
+    
+    res.status(200).json({ success: true, message: 'All messages marked as read' });
+  } catch (error) {
+    console.error('Error marking all as read:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Edit a message
+export const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    const { _id, role } = req.user;
+    
+    if (!content) {
+      return res.status(400).json({ message: 'Message content is required' });
+    }
+    
+    // Find the message
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    
+    // Check if user has permission to edit this message
+    // Admins can edit any message, otherwise users can only edit their own
+    if (role !== 'admin' && !message.sender.equals(_id)) {
+      return res.status(403).json({ message: 'Not authorized to edit this message' });
+    }
+    
+    // Update the message
+    message.content = content;
+    message.edited = true;
+    await message.save();
+    
+    // Update the conversation's last message if it was the last one
+    const conversation = await Conversation.findById(message.conversation);
+    if (conversation.lastMessage === message.content.substring(0, 50) + (message.content.length > 50 ? '...' : '')) {
+      conversation.lastMessage = content.substring(0, 50) + (content.length > 50 ? '...' : '');
+      await conversation.save();
+    }
+    
+    res.status(200).json(message);
+  } catch (error) {
+    console.error('Error editing message:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Delete a message
+export const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { _id, role } = req.user;
+    
+    // Find the message
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    
+    // Check if user has permission to delete this message
+    // Admins can delete any message, otherwise users can only delete their own
+    if (role !== 'admin' && !message.sender.equals(_id)) {
+      return res.status(403).json({ message: 'Not authorized to delete this message' });
+    }
+    
+    // Get the conversation to potentially update last message
+    const conversation = await Conversation.findById(message.conversation);
+    const conversationId = message.conversation;
+    
+    // Delete the message
+    await Message.findByIdAndDelete(messageId);
+    
+    // If deleted message was the last message in conversation, update lastMessage
+    if (conversation.lastMessage === message.content.substring(0, 50) + (message.content.length > 50 ? '...' : '')) {
+      // Find the new last message
+      const newLastMessage = await Message.findOne({ conversation: conversationId })
+        .sort({ createdAt: -1 })
+        .limit(1);
+      
+      // Update the conversation
+      if (newLastMessage) {
+        conversation.lastMessage = newLastMessage.content.substring(0, 50) + 
+          (newLastMessage.content.length > 50 ? '...' : '');
+      } else {
+        conversation.lastMessage = null;
+      }
+      
+      await conversation.save();
+    }
+    
+    res.status(200).json({ success: true, message: 'Message deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
 }; 
