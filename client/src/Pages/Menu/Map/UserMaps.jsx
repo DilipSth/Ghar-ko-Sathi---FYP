@@ -1021,26 +1021,34 @@ const UserMaps = () => {
                           <span
                             key={star}
                             onClick={() => setRating(star)}
-                            className={
-                              star <= rating
-                                ? "cursor-pointer"
-                                : "cursor-pointer text-gray-300"
-                            }
+                            className={`cursor-pointer ${
+                              star <= rating ? "text-yellow-400" : "text-gray-300"
+                            }`}
                           >
                             ★
                           </span>
                         ))}
                       </div>
                     </div>
-                    <textarea
-                      className="w-full p-2 border border-gray-300 rounded-md mb-4"
-                      placeholder="Leave a comment (optional)"
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                    />
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold mb-2">
+                        Your Review:
+                      </label>
+                      <textarea
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        rows="3"
+                        placeholder="Share your experience..."
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                      />
+                    </div>
                     <button
                       onClick={submitReview}
-                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                      className={`w-full py-2 rounded-lg ${
+                        rating > 0
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
                       disabled={rating === 0}
                     >
                       Submit Review

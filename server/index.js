@@ -352,15 +352,20 @@ io.on("connection", (socket) => {
     const booking = bookings.get(bookingId);
 
     if (booking && booking.status === "paid") {
-      booking.review = { rating, comment };
+      // Store the review with timestamp
+      booking.review = { 
+        rating, 
+        comment,
+        timestamp: new Date().toISOString(),
+        userId: booking.userId,
+        providerId: booking.providerId
+      };
       bookings.set(bookingId, booking);
 
+      // Update the service provider's average rating
       let providerSocketId = null;
       for (const [socketId, info] of connectedUsers) {
-        if (
-          info.userId === booking.providerId &&
-          info.role === "serviceProvider"
-        ) {
+        if (info.userId === booking.providerId && info.role === "serviceProvider") {
           providerSocketId = socketId;
           break;
         }
