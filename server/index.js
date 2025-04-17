@@ -220,6 +220,37 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("updateMaintenanceDetails", (data) => {
+    const { bookingId, maintenanceNotes, maintenancePrice, hourlyCharge, materialCost, additionalCharge, jobDuration, materials } = data;
+    const booking = bookings.get(bookingId);
+
+    if (booking) {
+      booking.maintenanceDetails = {
+        notes: maintenanceNotes,
+        price: maintenancePrice,
+        hourlyCharge,
+        materialCost,
+        additionalCharge,
+        jobDuration,
+        materials
+      };
+      bookings.set(bookingId, booking);
+
+      // Notify the user about the updated maintenance details
+      let userSocketId = null;
+      for (const [socketId, info] of connectedUsers) {
+        if (info.userId === booking.userId && info.role === "user") {
+          userSocketId = socketId;
+          break;
+        }
+      }
+
+      if (userSocketId) {
+        io.to(userSocketId).emit("maintenanceDetailsUpdated", booking);
+      }
+    }
+  });
+
   socket.on("completeJob", (data) => {
     const { bookingId, completedBy } = data;
     const booking = bookings.get(bookingId);
@@ -231,8 +262,17 @@ io.on("connection", (socket) => {
       if (booking.completedBy.length === 2) {
         booking.status = "completed";
         booking.details.endTime = new Date().toISOString();
-        const hoursWorked = 2;
-        booking.details.totalWage = hoursWorked * booking.details.wagePerHour;
+        
+        // Include maintenance details in the completed job data
+        if (booking.maintenanceDetails) {
+          booking.details.maintenancePrice = booking.maintenanceDetails.price;
+          booking.details.hourlyCharge = booking.maintenanceDetails.hourlyCharge;
+          booking.details.materialCost = booking.maintenanceDetails.materialCost;
+          booking.details.additionalCharge = booking.maintenanceDetails.additionalCharge;
+          booking.details.jobDuration = booking.maintenanceDetails.jobDuration;
+          booking.details.materials = booking.maintenanceDetails.materials;
+        }
+        
         bookings.set(bookingId, booking);
 
         let userSocketId = null;
@@ -240,16 +280,12 @@ io.on("connection", (socket) => {
         for (const [socketId, info] of connectedUsers) {
           if (info.userId === booking.userId && info.role === "user")
             userSocketId = socketId;
-          if (
-            info.userId === booking.providerId &&
-            info.role === "serviceProvider"
-          )
+          if (info.userId === booking.providerId && info.role === "serviceProvider")
             providerSocketId = socketId;
         }
 
         if (userSocketId) io.to(userSocketId).emit("jobCompleted", booking);
-        if (providerSocketId)
-          io.to(providerSocketId).emit("jobCompleted", booking);
+        if (providerSocketId) io.to(providerSocketId).emit("jobCompleted", booking);
       } else {
         bookings.set(bookingId, booking);
         if (completedBy === "provider") {
@@ -265,10 +301,7 @@ io.on("connection", (socket) => {
         } else {
           let providerSocketId = null;
           for (const [socketId, info] of connectedUsers) {
-            if (
-              info.userId === booking.providerId &&
-              info.role === "serviceProvider"
-            ) {
+            if (info.userId === booking.providerId && info.role === "serviceProvider") {
               providerSocketId = socketId;
               break;
             }

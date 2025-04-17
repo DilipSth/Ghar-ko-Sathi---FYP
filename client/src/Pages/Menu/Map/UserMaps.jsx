@@ -78,15 +78,11 @@ const UserMaps = () => {
       const durationHours = Math.ceil(
         (jobEndTime - booking.jobStartTime) / (1000 * 60 * 60)
       );
-      const hourlyCharge = durationHours <= 1 ? 200 : durationHours * 200;
-      const totalCharge = hourlyCharge + (booking.materialCost || 0);
       setBookingState("provider-completed");
       setBookingDetails({
         ...booking,
         jobEndTime,
         durationHours,
-        hourlyCharge,
-        totalCharge,
       });
     });
 
@@ -121,6 +117,11 @@ const UserMaps = () => {
       }
     });
 
+    socket.on("maintenanceDetailsUpdated", (booking) => {
+      console.log("Maintenance details updated:", booking);
+      setBookingDetails(booking);
+    });
+
     return () => {
       socket.off("bookingAccepted");
       socket.off("bookingDeclined");
@@ -132,6 +133,7 @@ const UserMaps = () => {
       socket.off("paymentSuccess");
       socket.off("reviewSubmitted");
       socket.off("location-update");
+      socket.off("maintenanceDetailsUpdated");
     };
   }, [socket]);
 
@@ -976,20 +978,16 @@ const UserMaps = () => {
                       )}
                       <div className="bg-yellow-50 p-2 rounded">
                         <p className="text-sm font-medium">Additional Charges</p>
-                        <p className="text-sm">Rs. {typeof bookingDetails.additionalCharge !== 'undefined' && bookingDetails.additionalCharge !== null ? bookingDetails.additionalCharge : 0}</p>
+                        <p className="text-sm">Rs. {bookingDetails.details?.additionalCharge || 0}</p>
                       </div>
                       <div className="bg-green-50 p-2 rounded">
                         <p className="text-sm font-medium">Total Price</p>
                         <p className="text-lg font-bold">
-                          Rs. {
-                            bookingDetails.maintenancePrice && !isNaN(Number(bookingDetails.maintenancePrice))
-                              ? bookingDetails.maintenancePrice
-                              : (
-                                  (bookingDetails.hourlyCharge || ((bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)) +
-                                  (bookingDetails.materialCost || 0) +
-                                  (typeof bookingDetails.additionalCharge !== 'undefined' && bookingDetails.additionalCharge !== null ? Number(bookingDetails.additionalCharge) : 0)
-                                )
-                          }
+                          Rs. {bookingDetails.details?.maintenancePrice || (
+                            (bookingDetails.details?.hourlyCharge || ((bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)) +
+                            (bookingDetails.details?.materialCost || 0) +
+                            (bookingDetails.details?.additionalCharge || 0)
+                          )}
                         </p>
                       </div>
                       <p className="text-sm">
