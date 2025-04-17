@@ -48,7 +48,7 @@ io.on("connection", (socket) => {
       bookingData;
     const bookingId = `${userId}-${providerId}-${Date.now()}`;
 
-    const user = await User.findById(userId).select("name");
+    const user = await User.findById(userId).select("name phoneNo");
     const provider = await ServiceProvider.findById(providerId)
       .select("name services profileImage")
       .populate("services"); // Populate services to get ser_name
@@ -66,6 +66,7 @@ io.on("connection", (socket) => {
         requestTime: new Date().toISOString(),
         wagePerHour: 200,
         userName: user?.name || "Unknown User",
+        userPhone: user?.phoneNo || "Not provided",
         providerName: provider?.name || "Unknown Provider",
         providerServices:
           provider?.services.map((s) => s.ser_name).join(", ") ||

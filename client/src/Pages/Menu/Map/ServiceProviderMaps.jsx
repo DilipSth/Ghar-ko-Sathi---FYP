@@ -498,23 +498,28 @@ const ServiceProviderMap = () => {
                               <div className="flex items-start">
                                 <div>
                                   <h5 className="font-medium">
-                                    {request.details.address.split(",")[0]}
+                                    {request.details.userName || "Unknown User"}
                                   </h5>
-                                  <p className="text-xs text-gray-600">
-                                    {request.details.service} -{" "}
-                                    {request.details.issue}
+                                  <p className="text-sm text-gray-600">
+                                    {request.details.service} - {request.details.issue}
                                   </p>
                                   <p className="text-xs text-gray-600">
-                                    {new Date(
-                                      request.details.requestTime
-                                    ).toLocaleTimeString()}
+                                    {new Date(request.details.requestTime).toLocaleTimeString()}
                                   </p>
                                   <p className="text-xs text-gray-600">
-                                    Phone: {request.userPhone}
+                                    <span className="font-medium">Phone:</span>{" "}
+                                    {request.details.userPhone || "Not provided"}
                                   </p>
                                   <p className="text-xs text-gray-600">
-                                    Location: {request.userLocationName}
+                                    <span className="font-medium">Address:</span>{" "}
+                                    {request.details.address}
                                   </p>
+                                  {request.details.description && (
+                                    <p className="text-xs text-gray-600 mt-1">
+                                      <span className="font-medium">Description:</span>{" "}
+                                      {request.details.description}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                               <button
