@@ -31,7 +31,6 @@ const UserMaps = () => {
   const [providerEta, setProviderEta] = useState(null);
   const [providerDistance, setProviderDistance] = useState(null);
   const [providerLocation, setProviderLocation] = useState(null);
-  const mapContainerRef = useRef(null);
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
   const location = useLocation();
@@ -291,14 +290,19 @@ const UserMaps = () => {
     }
   };
 
-  const resetBooking = () => {
+  const resetBooking = useCallback(() => {
     setSelectedProvider(null);
     setBookingState("idle");
     setBookingDetails(null);
     setDescription("");
     setRating(0);
     setComment("");
-  };
+    setError(null);
+    setSuccessMessage(null);
+    setProviderLocation(null);
+    setProviderEta(null);
+    setProviderDistance(null);
+  }, []);
 
   const [locationName, setLocationName] = useState("");
   const locationNameCache = useRef({});
@@ -376,714 +380,685 @@ const UserMaps = () => {
   }, [currentPosition, getLocationName, locationName]);
 
   return (
-    <div className="p-4 h-full">
-      <div className="bg-white p-4 rounded-lg shadow-md h-full flex flex-col">
-        <h3 className="font-bold text-2xl mb-4 text-blue-600">
-          Book a Service
-        </h3>
-        <div className="flex flex-wrap justify-around mb-4">
-          {["All", "Available"].map((status) => (
-            <div
-              key={status}
-              className={`flex flex-col items-center mb-2 md:mb-0 md:flex-row md:items-start cursor-pointer hover:text-blue-600 ${
-                activeFilter === status ? "text-blue-600 font-semibold" : ""
-              }`}
-              onClick={() => setActiveFilter(status)}
-            >
-              <span>{status}</span>
-              <span className="text-gray-600 ml-1">
-                (
-                {status === "All"
-                  ? serviceProviders.length
-                  : status === "Available"
-                  ? serviceProviders.filter((p) => p.status === "Active").length
-                  : 0}
-                )
-              </span>
-            </div>
-          ))}
-        </div>
-        {loading && (
-          <div className="flex-grow flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          </div>
-        )}
-        {error && (
-          <div className="flex-grow flex items-center justify-center">
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              <p>{error}</p>
-              <button
-                onClick={fetchServiceProviders}
-                className="mt-2 bg-red-600 text-white py-1 px-3 rounded hover:bg-red-700"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        )}
-        {!loading && (
-          <div className="flex flex-col flex-grow">
+    <div className="h-screen flex flex-col">
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4">
+        {/* Map Section */}
+        <div className="flex-1 min-h-[400px] lg:min-h-[600px] bg-white rounded-lg shadow-lg p-4 relative">
+          <div className="h-full rounded-lg overflow-hidden">
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
+                <div className="flex flex-col items-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-2"></div>
+                  <p className="text-gray-600">Loading service providers...</p>
+                </div>
+              </div>
+            )}
             {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 relative">
-                <p>{error}</p>
-                <button
-                  onClick={() => setError(null)}
-                  className="absolute top-0 right-0 p-2 text-red-700 hover:text-red-900"
-                >
-                  ×
-                </button>
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
+                <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg max-w-md">
+                  <div className="flex items-center mb-2">
+                    <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <h3 className="font-semibold">Error</h3>
+                  </div>
+                  <p className="mb-4">{error}</p>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setError(null)}
+                      className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
-
             {successMessage && (
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 relative">
-                <p>{successMessage}</p>
-                <button
-                  onClick={() => setSuccessMessage(null)}
-                  className="absolute top-0 right-0 p-2 text-green-700 hover:text-green-900"
-                >
-                  ×
-                </button>
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
+                <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg max-w-md">
+                  <div className="flex items-center mb-2">
+                    <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <h3 className="font-semibold">Success</h3>
+                  </div>
+                  <p className="mb-4">{successMessage}</p>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setSuccessMessage(null)}
+                      className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
-            <div
-              ref={mapContainerRef}
-              className="h-2/3 rounded overflow-hidden mb-4"
-            >
-              <LiveTracking
-                bookingDetails={bookingDetails}
-                showDirections={bookingState === "ongoing"}
-                serviceProviders={filteredProviders}
-                onPositionUpdate={(position) => setCurrentPosition(position)}
-                bookingState={bookingState}
-              />
-            </div>
-            <div className="h-1/3 overflow-y-auto relative">
-              {bookingState === "idle" && !selectedProvider && (
-                <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-                  <h3 className="text-lg font-medium text-gray-800 mb-3">
-                    Available Service Providers
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredProviders
-                      .filter((provider) => provider.status === "Active")
-                      .map((provider) => (
-                        <div
-                          key={provider.id}
-                          className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
-                          onClick={() => handleProviderSelect(provider)}
-                        >
-                          <div className="flex items-center mb-2">
+            <LiveTracking
+              bookingDetails={bookingDetails}
+              showDirections={bookingState === "ongoing"}
+              serviceProviders={filteredProviders}
+              onPositionUpdate={(position) => setCurrentPosition(position)}
+              bookingState={bookingState}
+              providerLocation={providerLocation}
+              providerEta={providerEta}
+              providerDistance={providerDistance}
+            />
+          </div>
+        </div>
+
+        {/* Side Panel */}
+        <div className="w-full lg:w-[380px] flex flex-col gap-4 overflow-hidden">
+          {/* Service Providers List */}
+          {bookingState === "idle" && !selectedProvider && (
+            <div className="bg-white rounded-lg shadow-lg p-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <div className="sticky top-0 bg-white z-10 pb-2 mb-4 border-b">
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">
+                  Available Service Providers
+                </h3>
+                <div className="flex gap-2">
+                  {["All", "Available"].map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setActiveFilter(status)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        activeFilter === status
+                          ? "bg-blue-500 text-white shadow-sm"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {filteredProviders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+                  <svg className="h-16 w-16 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-lg text-center">No service providers available.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredProviders
+                    .filter((provider) => provider.status === "Active")
+                    .map((provider) => (
+                      <div
+                        key={provider.id}
+                        className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => handleProviderSelect(provider)}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className="relative w-16 h-16 flex-shrink-0">
                             <img
-                              src={provider.image}
+                              src={`http://localhost:8000/public/registerImage/${provider.profileImage}`}
                               alt={provider.name}
-                              className="w-12 h-12 rounded-full mr-3 object-cover"
+                              className="w-full h-full rounded-lg object-cover border-2 border-blue-100"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = "https://via.placeholder.com/50";
+                                e.target.src = "https://via.placeholder.com/64?text=P";
                               }}
                             />
-                            <div>
-                              <h4 className="font-semibold">{provider.name}</h4>
-                              <div className="flex items-center text-sm text-yellow-500">
-                                <span className="mr-1">{provider.rating}</span>
-                                <span>★</span>
-                              </div>
+                            <div className="absolute -bottom-1 -right-1">
+                              <span className="bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full shadow-sm">
+                                Active
+                              </span>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-600 mb-1">
-                            <span className="font-medium">Services:</span>{" "}
-                            {provider.services}
-                          </p>
-                          <p className="text-sm text-gray-600 mb-2">
-                            <span className="font-medium">Jobs:</span>{" "}
-                            {provider.completedJobs}
-                          </p>
-                          <p className="text-sm text-gray-600 mb-2">
-                            <span className="font-medium">Phone:</span>{" "}
-                            {provider.phone}
-                          </p>
-                          <button
-                            className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-sm transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleProviderSelect(provider);
-                            }}
-                          >
-                            Book Now
-                          </button>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-base font-semibold text-gray-900 mb-0.5 truncate">
+                              {provider.name}
+                            </h4>
+                            <div className="flex items-center mb-1">
+                              <div className="flex items-center text-yellow-400">
+                                {[...Array(5)].map((_, index) => (
+                                  <span
+                                    key={index}
+                                    className={`text-sm ${
+                                      index < Math.floor(provider.rating)
+                                        ? "text-yellow-400"
+                                        : "text-gray-300"
+                                    }`}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <span className="text-sm font-medium text-gray-700 ml-1">
+                                {provider.rating}
+                              </span>
+                              <span className="text-xs text-gray-500 ml-1">
+                                ({provider.completedJobs})
+                              </span>
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="text-sm text-gray-600 truncate">
+                                <span className="font-medium">Services:</span>{" "}
+                                {provider.services}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                <span className="font-medium">Phone:</span>{" "}
+                                {provider.phone}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      ))}
-                  </div>
-                  {filteredProviders.filter(
-                    (provider) => provider.status === "Active"
-                  ).length === 0 && (
-                    <p className="text-center text-gray-500 py-4">
-                      No active service providers available at the moment.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {selectedProvider && bookingState === "idle" && (
-                <div
-                  className="absolute bg-white rounded-lg shadow-lg p-4"
-                  style={{
-                    bottom: "20px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: "350px",
-                    pointerEvents: "auto",
-                    zIndex: 1000,
-                  }}
-                >
-                  <button
-                    onClick={resetBooking}
-                    className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                  >
-                    ×
-                  </button>
-                  <div className="flex items-center mb-3">
-                    <img
-                      src={selectedProvider.image}
-                      alt={selectedProvider.name}
-                      className="w-16 h-16 rounded-full mr-3 object-cover border-2 border-blue-500"
-                    />
-                    <div>
-                      <h4 className="font-bold text-lg">
-                        {selectedProvider.name}
-                      </h4>
-                      <div className="flex items-center">
-                        <span className="text-yellow-500 mr-1">
-                          {selectedProvider.rating}
-                        </span>
-                        <span className="text-yellow-500">★</span>
-                        <span className="text-sm text-gray-500 ml-1">
-                          ({selectedProvider.completedJobs} jobs)
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        {selectedProvider.services}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {selectedProvider.phone}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mb-4 bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm flex justify-between">
-                      <span className="font-medium">Phone:</span>
-                      <span>{selectedProvider.phone}</span>
-                    </p>
-                    <p className="text-sm flex justify-between">
-                      <span className="font-medium">Services:</span>
-                      <span className="text-right">
-                        {selectedProvider.services}
-                      </span>
-                    </p>
-                    <p className="text-sm flex justify-between">
-                      <span className="font-medium">Rate:</span>
-                      <span>Rs {selectedProvider.hourlyRate}/hour</span>
-                    </p>
-                    <p className="text-sm flex justify-between">
-                      <span className="font-medium">Status:</span>
-                      <span className="text-green-500 font-medium">
-                        {selectedProvider.status}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Describe your problem
-                    </label>
-                    <textarea
-                      className="w-full p-3 border border-gray-300 rounded-md mb-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="Please describe your issue in detail..."
-                      rows="3"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={resetBooking}
-                      className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition duration-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleBooking}
-                      className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center justify-center"
-                      disabled={!description}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 mr-1"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Book Now
-                    </button>
-                  </div>
-                </div>
-              )}
-              {bookingState === "waiting" && bookingDetails && (
-                <div className="bg-white rounded-lg shadow-lg p-4">
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6 text-center">
-                    <div className="animate-pulse mb-4">
-                      <div className="w-16 h-16 mx-auto rounded-full bg-blue-500 flex items-center justify-center">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-8 w-8 text-white"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
+                        <button
+                          className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white py-1.5 px-4 rounded-lg transition-all flex items-center justify-center text-sm font-medium shadow-sm hover:shadow-md"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleProviderSelect(provider);
+                          }}
                         >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                          <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Book Now
+                        </button>
                       </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Selected Provider Details */}
+          {selectedProvider && bookingState === "idle" && (
+            <div className="bg-white rounded-xl shadow-lg p-6 animate-fade-in">
+              <div className="flex items-start space-x-4 mb-6">
+                <img
+                  src={selectedProvider.image}
+                  alt={selectedProvider.name}
+                  className="w-24 h-24 rounded-lg object-cover border-2 border-blue-500"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://via.placeholder.com/96?text=Provider";
+                  }}
+                />
+                <div>
+                  <h4 className="text-2xl font-bold text-gray-900 mb-2">{selectedProvider.name}</h4>
+                  <div className="flex items-center mb-2">
+                    <div className="flex items-center text-yellow-400">
+                      {[...Array(5)].map((_, index) => (
+                        <span
+                          key={index}
+                          className={`text-lg ${
+                            index < Math.floor(selectedProvider.rating)
+                              ? "text-yellow-400"
+                              : "text-gray-300"
+                          }`}
+                        >
+                          ★
+                        </span>
+                      ))}
                     </div>
-                    <h3 className="text-xl font-bold mb-2">
-                      Waiting for {selectedProvider.name} to Accept
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Your request has been sent and is waiting for
-                      confirmation.
-                    </p>
-                    <div className="bg-blue-50 p-3 rounded-lg mb-4">
-                      <p className="text-sm flex justify-between">
+                    <span className="text-lg font-medium text-gray-700 ml-2">
+                      {selectedProvider.rating}
+                    </span>
+                    <span className="text-gray-600 ml-2 text-lg">
+                      ({selectedProvider.completedJobs} jobs)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6 bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between text-lg">
+                  <span className="font-medium text-gray-700">Services:</span>
+                  <span className="text-gray-900">{selectedProvider.services}</span>
+                </div>
+                <div className="flex justify-between text-lg">
+                  <span className="font-medium text-gray-700">Rate:</span>
+                  <span className="text-gray-900">Rs {selectedProvider.hourlyRate}/hour</span>
+                </div>
+                <div className="flex justify-between text-lg">
+                  <span className="font-medium text-gray-700">Status:</span>
+                  <span className="text-green-600 font-medium">
+                    {selectedProvider.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-lg font-medium text-gray-700 mb-2">
+                  Describe your problem
+                </label>
+                <textarea
+                  className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-700 text-lg"
+                  placeholder="Please describe your issue in detail..."
+                  rows="4"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={resetBooking}
+                  className="flex-1 bg-gray-100 text-gray-800 py-3 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center text-lg font-medium"
+                >
+                  <svg className="h-6 w-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBooking}
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!description}
+                >
+                  <svg className="h-6 w-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Book Now
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Booking Status Messages */}
+          {bookingState !== "idle" && bookingDetails && (
+            <div className="bg-white rounded-xl shadow-lg p-6 animate-fade-in max-h-[calc(100vh-2rem)] overflow-y-auto">
+              {bookingState === "waiting" && (
+                <div className="text-center">
+                  <div className="animate-pulse mb-4">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-blue-500 flex items-center justify-center">
+                      <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">
+                    Waiting for {selectedProvider.name} to Accept
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Your request has been sent and is waiting for confirmation.
+                  </p>
+                  <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                    <div className="space-y-2">
+                      <p className="flex justify-between">
                         <span className="font-semibold">Services:</span>
                         <span>{selectedProvider.services}</span>
                       </p>
-                      <p className="text-sm flex justify-between">
+                      <p className="flex justify-between">
                         <span className="font-semibold">Description:</span>
                         <span className="text-right">{description}</span>
                       </p>
-                      <p className="text-sm flex justify-between">
-                        <span className="font-semibold">Phone:</span>
-                        <span>{selectedProvider.phone}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={resetBooking}
+                    className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
+                  >
+                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Cancel Request
+                  </button>
+                </div>
+              )}
+
+              {bookingState === "accepted" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center animate-bounce">
+                      <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-center">Booking Accepted</h3>
+                  <p className="text-gray-600 text-center mb-4">
+                    Please confirm to proceed with the service.
+                  </p>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-center">
+                      <img
+                        src={bookingDetails.details?.providerImage || "https://via.placeholder.com/50"}
+                        alt={bookingDetails.details?.providerName}
+                        className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-blue-500"
+                      />
+                      <div>
+                        <p className="font-semibold">{bookingDetails.details?.providerName}</p>
+                        <p className="text-sm text-gray-600">{bookingDetails.details?.providerServices}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm">
+                        <span className="font-medium">Description:</span> {bookingDetails.description}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-medium">Phone:</span> {bookingDetails.details?.providerPhone}
                       </p>
                     </div>
+                  </div>
+                  <div className="flex gap-3">
                     <button
                       onClick={resetBooking}
-                      className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition duration-200 flex items-center justify-center"
+                      className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 mr-1"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                          clipRule="evenodd"
-                        />
+                      <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
-                      Cancel Request
+                      Cancel
                     </button>
-                  </div>
-                </div>
-              )}
-              {bookingState === "accepted" && bookingDetails && (
-                <div className="bg-white rounded-lg shadow-lg p-4">
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-xl font-bold mb-4">Booking Accepted</h3>
-                    <p className="text-gray-600 mb-4">
-                      Please confirm to proceed.
-                    </p>
-                    <div className="space-y-2 mb-6">
-                      <div className="flex items-center">
-                        <img
-                          src={
-                            bookingDetails.details?.providerImage
-                              ? `http://localhost:8000${bookingDetails.details.providerImage}`
-                              : "https://via.placeholder.com/50"
-                          }
-                          alt={bookingDetails.details?.providerName}
-                          className="w-10 h-10 rounded-full mr-2 object-cover"
-                        />
-                        <p className="text-sm">
-                          <span className="font-semibold">Provider:</span>{" "}
-                          {bookingDetails.details?.providerName}
-                        </p>
-                      </div>
-                      <p className="text-sm">
-                        <span className="font-semibold">Services:</span>{" "}
-                        {bookingDetails.details?.providerServices}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Description:</span>{" "}
-                        {bookingDetails.description}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Phone:</span>{" "}
-                        {bookingDetails.details?.providerPhone}
-                      </p>
-
-                      {providerEta && (
-                        <div className="bg-blue-50 p-3 rounded-lg mt-3">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-sm font-medium">
-                                Service provider is on the way
-                              </p>
-                              {providerDistance && (
-                                <p className="text-xs text-gray-600">
-                                  Distance: {providerDistance} km
-                                </p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-blue-600">
-                                {providerEta} min
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Estimated arrival time
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={resetBooking}
-                        className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={confirmBooking}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {bookingState === "confirmed" && bookingDetails && (
-                <div className="bg-white rounded-lg shadow-lg p-4">
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-xl font-bold mb-4">
-                      Booking Confirmed
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      The provider will start soon.
-                    </p>
-                    <div className="space-y-2 mb-6">
-                      <div className="flex items-center">
-                        <img
-                          src={
-                            bookingDetails.details?.providerImage
-                              ? `http://localhost:8000${bookingDetails.details.providerImage}`
-                              : "https://via.placeholder.com/50"
-                          }
-                          alt={bookingDetails.details?.providerName}
-                          className="w-10 h-10 rounded-full mr-2 object-cover"
-                        />
-                        <p className="text-sm">
-                          <span className="font-semibold">Provider:</span>{" "}
-                          {bookingDetails.details?.providerName}
-                        </p>
-                      </div>
-                      <p className="text-sm">
-                        <span className="font-semibold">Services:</span>{" "}
-                        {bookingDetails.details?.providerServices}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Description:</span>{" "}
-                        {bookingDetails.description}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Phone:</span>{" "}
-                        {bookingDetails.details?.providerPhone}
-                      </p>
-
-                      {providerEta && (
-                        <div className="bg-blue-50 p-3 rounded-lg mt-3">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-sm font-medium">
-                                Service provider is on the way
-                              </p>
-                              {providerDistance && (
-                                <p className="text-xs text-gray-600">
-                                  Distance: {providerDistance} km
-                                </p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-blue-600">
-                                {providerEta} min
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Estimated arrival time
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {bookingState === "ongoing" && bookingDetails && (
-                <div className="bg-white rounded-lg shadow-lg p-4">
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-xl font-bold mb-4">
-                      Service in Progress
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      The provider is working on your request.
-                    </p>
-                    <div className="space-y-2 mb-6">
-                      <div className="flex items-center">
-                        <img
-                          src={
-                            bookingDetails.details?.providerImage
-                              ? `http://localhost:8000${bookingDetails.details.providerImage}`
-                              : "https://via.placeholder.com/50"
-                          }
-                          alt={bookingDetails.details?.providerName}
-                          className="w-10 h-10 rounded-full mr-2 object-cover"
-                        />
-                        <p className="text-sm">
-                          <span className="font-semibold">Provider:</span>{" "}
-                          {bookingDetails.details?.providerName}
-                        </p>
-                      </div>
-                      <p className="text-sm">
-                        <span className="font-semibold">Services:</span>{" "}
-                        {bookingDetails.details?.providerServices}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Description:</span>{" "}
-                        {bookingDetails.description}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Phone:</span>{" "}
-                        {bookingDetails.details?.providerPhone}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {bookingState === "provider-completed" && bookingDetails && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-xl font-bold mb-4">
-                      Provider Completed Job
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Please confirm completion.
-                    </p>
-                    <div className="space-y-2 mb-6">
-                      <div className="flex items-center">
-                        <img
-                          src={
-                            bookingDetails.details?.providerImage
-                              ? `http://localhost:8000${bookingDetails.details.providerImage}`
-                              : "https://via.placeholder.com/50"
-                          }
-                          alt={bookingDetails.details?.providerName}
-                          className="w-10 h-10 rounded-full mr-2 object-cover"
-                        />
-                        <p className="text-sm">
-                          <span className="font-semibold">Provider:</span>{" "}
-                          {bookingDetails.details?.providerName}
-                        </p>
-                      </div>
-                      <p className="text-sm">
-                        <span className="font-semibold">Services:</span>{" "}
-                        {bookingDetails.details?.providerServices}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Phone:</span>{" "}
-                        {bookingDetails.details?.providerPhone}
-                      </p>
-                    </div>
                     <button
-                      onClick={completeJob}
-                      className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+                      onClick={confirmBooking}
+                      className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
                     >
-                      Confirm Completion
+                      <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Confirm
                     </button>
                   </div>
                 </div>
               )}
-              {bookingState === "completed" && bookingDetails && (
-                <div className="bg-white rounded-lg shadow-lg p-4">
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-xl font-bold mb-4">Payment</h3>
-                    <p className="text-gray-600 mb-4">
-                      Job completed. Please proceed with payment.
-                    </p>
-                    <div className="space-y-2 mb-6">
-                      <div className="flex items-center">
-                        <img
-                          src={
-                            bookingDetails.details?.providerImage
-                              ? `http://localhost:8000${bookingDetails.details.providerImage}`
-                              : "https://via.placeholder.com/50"
-                          }
-                          alt={bookingDetails.details?.providerName}
-                          className="w-10 h-10 rounded-full mr-2 object-cover"
-                        />
-                        <p className="text-sm">
-                          <span className="font-semibold">Provider:</span>{" "}
-                          {bookingDetails.details?.providerName}
-                        </p>
+
+              {bookingState === "confirmed" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center animate-pulse">
+                      <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-center">Service Starting Soon</h3>
+                  <p className="text-gray-600 text-center mb-4">
+                    The service provider will begin shortly.
+                  </p>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-center">
+                      <img
+                        src={bookingDetails.details?.providerImage || "https://via.placeholder.com/50"}
+                        alt={bookingDetails.details?.providerName}
+                        className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-blue-500"
+                      />
+                      <div>
+                        <p className="font-semibold">{bookingDetails.details?.providerName}</p>
+                        <p className="text-sm text-gray-600">{bookingDetails.details?.providerServices}</p>
                       </div>
+                    </div>
+                    <div className="space-y-2">
                       <p className="text-sm">
-                        <span className="font-semibold">Duration:</span>{" "}
-                        {bookingDetails.jobDuration || bookingDetails.durationHours || 1} hour
+                        <span className="font-medium">Description:</span> {bookingDetails.description}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-medium">Phone:</span> {bookingDetails.details?.providerPhone}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {bookingState === "ongoing" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-yellow-500 flex items-center justify-center animate-spin">
+                      <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-center">Service in Progress</h3>
+                  <p className="text-gray-600 text-center mb-4">
+                    The service provider is currently working on your request.
+                  </p>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-center">
+                      <img
+                        src={bookingDetails.details?.providerImage || "https://via.placeholder.com/50"}
+                        alt={bookingDetails.details?.providerName}
+                        className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-blue-500"
+                      />
+                      <div>
+                        <p className="font-semibold">{bookingDetails.details?.providerName}</p>
+                        <p className="text-sm text-gray-600">{bookingDetails.details?.providerServices}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm">
+                        <span className="font-medium">Description:</span> {bookingDetails.description}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-medium">Phone:</span> {bookingDetails.details?.providerPhone}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {bookingState === "provider-completed" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center animate-bounce">
+                      <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-center">Service Completed</h3>
+                  <p className="text-gray-600 text-center mb-4">
+                    The service provider has completed the job. Please confirm.
+                  </p>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-center">
+                      <img
+                        src={bookingDetails.details?.providerImage || "https://via.placeholder.com/50"}
+                        alt={bookingDetails.details?.providerName}
+                        className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-blue-500"
+                      />
+                      <div>
+                        <p className="font-semibold">{bookingDetails.details?.providerName}</p>
+                        <p className="text-sm text-gray-600">{bookingDetails.details?.providerServices}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm">
+                        <span className="font-medium">Duration:</span> {bookingDetails.jobDuration || bookingDetails.durationHours || 1} hour
                         {(bookingDetails.jobDuration || bookingDetails.durationHours) > 1 ? "s" : ""}
                       </p>
-                      <div className="bg-blue-50 p-2 rounded">
-                        <p className="text-sm font-medium">Hourly Charge</p>
-                        <p className="text-sm">
-                          {(bookingDetails.jobDuration || bookingDetails.durationHours || 1)} × Rs. 200 = Rs. {bookingDetails.hourlyCharge || ((bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)}
-                        </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={completeJob}
+                    className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
+                  >
+                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Confirm Completion
+                  </button>
+                </div>
+              )}
+
+              {bookingState === "completed" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center animate-pulse">
+                      <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-center">Payment Details</h3>
+                  <p className="text-gray-600 text-center mb-4">
+                    Please review and proceed with payment.
+                  </p>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="font-medium">Service Duration:</span>
+                        <span>{bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1} hour
+                          {(bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1) > 1 ? "s" : ""}</span>
                       </div>
-                      {bookingDetails.materials && bookingDetails.materials.length > 0 && (
-                        <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-sm font-medium mb-1">Materials Used:</p>
-                          <ul className="space-y-1">
-                            {bookingDetails.materials.map((material, idx) => (
-                              <li key={idx} className="flex justify-between text-sm">
-                                <span>{material.name}</span>
-                                <span>Rs. {material.cost}</span>
-                              </li>
-                            ))}
-                            <li className="pt-1 border-t text-sm font-medium flex justify-between">
-                              <span>Total Material Cost:</span>
-                              <span>Rs. {bookingDetails.materialCost || 0}</span>
-                            </li>
-                          </ul>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Hourly Rate:</span>
+                        <span>Rs. 200/hour</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Service Charge:</span>
+                        <span>Rs. {bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.hourlyCharge || ((bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)}</span>
+                      </div>
+                    </div>
+
+                    {(bookingDetails.maintenanceDetails?.materials || bookingDetails.materials) && 
+                     (bookingDetails.maintenanceDetails?.materials?.length > 0 || bookingDetails.materials?.length > 0) && (
+                      <div className="border-t pt-2">
+                        <p className="font-medium mb-2">Materials Used:</p>
+                        <div className="space-y-1">
+                          {(bookingDetails.maintenanceDetails?.materials || bookingDetails.materials).map((material, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span>{material.name}</span>
+                              <span>Rs. {material.cost}</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between font-medium pt-1 border-t">
+                            <span>Total Material Cost:</span>
+                            <span>Rs. {bookingDetails.maintenanceDetails?.materialCost || bookingDetails.materialCost || 0}</span>
+                          </div>
                         </div>
-                      )}
-                      <div className="bg-yellow-50 p-2 rounded">
-                        <p className="text-sm font-medium">Additional Charges</p>
-                        <p className="text-sm">Rs. {bookingDetails.details?.additionalCharge || 0}</p>
                       </div>
-                      <div className="bg-green-50 p-2 rounded">
-                        <p className="text-sm font-medium">Total Price</p>
-                        <p className="text-lg font-bold">
-                          Rs. {bookingDetails.details?.maintenancePrice || (
-                            (bookingDetails.details?.hourlyCharge || ((bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)) +
-                            (bookingDetails.details?.materialCost || 0) +
-                            (bookingDetails.details?.additionalCharge || 0)
-                          )}
+                    )}
+
+                    <div className="border-t pt-2">
+                      <div className="flex justify-between">
+                        <span className="font-medium">Additional Charges:</span>
+                        <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.additionalCharge || 0}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t">
+                        <span>Total Amount:</span>
+                        <span>Rs. {
+                          (bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.hourlyCharge || ((bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)) +
+                          (bookingDetails.maintenanceDetails?.materialCost || bookingDetails.materialCost || 0) +
+                          (bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.additionalCharge || 0)
+                        }</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={submitPayment}
+                    className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                  >
+                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Pay Now
+                  </button>
+                </div>
+              )}
+
+              {bookingState === "paid" && (
+                <div className="bg-white rounded-lg shadow-lg p-4">
+                  <div className="text-center space-y-4">
+                    <div className="flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center animate-bounce">
+                        <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Payment Successful</h3>
+                      <p className="text-base text-gray-600 mt-1">
+                        Please rate your experience
+                      </p>
+                    </div>
+                    <div className="max-w-md mx-auto space-y-4">
+                      <div>
+                        <p className="text-base font-medium mb-2">Rating</p>
+                        <div className="flex justify-center space-x-3">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={() => setRating(star)}
+                              className={`transform transition-all duration-200 ${
+                                star <= rating
+                                  ? "text-yellow-400 scale-110"
+                                  : "text-gray-300 hover:text-yellow-400 hover:scale-110"
+                              }`}
+                            >
+                              <span className="text-3xl">★</span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {rating === 0 ? "Select a rating" : `You rated ${rating} star${rating !== 1 ? "s" : ""}`}
                         </p>
                       </div>
-                      <p className="text-sm">
-                        <span className="font-semibold">Method:</span> Cash
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-semibold">Phone:</span>{" "}
-                        {bookingDetails.details?.providerPhone}
-                      </p>
-                    </div>
-                    <button
-                      onClick={submitPayment}
-                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Pay Now
-                    </button>
-                  </div>
-                </div>
-              )}
-              {bookingState === "paid" && bookingDetails && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-xl font-bold mb-4">Review Service</h3>
-                    <div className="mb-4">
-                      <p className="text-sm font-semibold mb-2">Rating:</p>
-                      <div className="flex space-x-1 text-2xl text-yellow-400">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span
-                            key={star}
-                            onClick={() => setRating(star)}
-                            className={`cursor-pointer ${
-                              star <= rating ? "text-yellow-400" : "text-gray-300"
-                            }`}
-                          >
-                            ★
-                          </span>
-                        ))}
+                      <div>
+                        <label className="block text-base font-medium mb-2">
+                          Your Review
+                        </label>
+                        <textarea
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-700 text-sm resize-none"
+                          rows="3"
+                          placeholder="Share your experience..."
+                          value={comment}
+                          onChange={(e) => setComment(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={resetBooking}
+                          className="flex-1 bg-gray-100 text-gray-800 py-2 rounded-lg hover:bg-gray-200 transition-all flex items-center justify-center text-sm font-medium"
+                        >
+                          <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Skip
+                        </button>
+                        <button
+                          onClick={submitReview}
+                          disabled={rating === 0}
+                          className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center text-sm font-medium ${
+                            rating > 0
+                              ? "bg-blue-500 text-white hover:bg-blue-600 shadow-sm hover:shadow-md"
+                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }`}
+                        >
+                          <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                          </svg>
+                          Submit Review
+                        </button>
                       </div>
                     </div>
-                    <div className="mb-4">
-                      <label className="block text-sm font-semibold mb-2">
-                        Your Review:
-                      </label>
-                      <textarea
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                        rows="3"
-                        placeholder="Share your experience..."
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                      />
-                    </div>
-                    <button
-                      onClick={submitReview}
-                      className={`w-full py-2 rounded-lg ${
-                        rating > 0
-                          ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
-                      disabled={rating === 0}
-                    >
-                      Submit Review
-                    </button>
-                    <button
-                      onClick={resetBooking}
-                      className="w-full mt-2 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600"
-                    >
-                      Skip
-                    </button>
                   </div>
                 </div>
               )}
+
               {bookingState === "reviewed" && (
-                <div
-                  className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4"
-                  style={{ pointerEvents: "auto" }}
-                >
-                  <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6 text-center">
-                    <h3 className="text-xl font-bold mb-4">Thank You!</h3>
-                    <p className="text-gray-600 mb-4">
-                      Your review has been submitted.
-                    </p>
-                    <button
-                      onClick={resetBooking}
-                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Back to Map
-                    </button>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center animate-bounce">
+                      <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
                   </div>
+                  <h3 className="text-xl font-bold text-center">Thank You!</h3>
+                  <p className="text-gray-600 text-center mb-4">
+                    Your review has been submitted successfully.
+                  </p>
+                  <button
+                    onClick={resetBooking}
+                    className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                  >
+                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Back to Map
+                  </button>
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
