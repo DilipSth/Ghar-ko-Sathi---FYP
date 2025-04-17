@@ -24,6 +24,7 @@ import ServiceProviderMap from "../Pages/Menu/Map/ServiceProviderMaps";
 import UserMaps from "../Pages/Menu/Map/UserMaps";
 import Security from "../Pages/Legal/Security";
 import Privacy from "../Pages/Legal/Privacy";
+import Chat from "../Pages/Contact/Chat";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -159,6 +160,11 @@ const AdminRoutes = () => {
         <Route path="legal" element={<Outlet />}>
           <Route path="security" element={<Security />} />
           <Route path="privacy" element={<Privacy />} />
+        </Route>
+
+        {/* Contact Routes */}
+        <Route path="contact" element={<Outlet />}>
+          <Route path="chat" element={<Chat />} />
         </Route>
       </Route>
 

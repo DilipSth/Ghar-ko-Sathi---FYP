@@ -2,6 +2,7 @@ import { TbMapStar } from "react-icons/tb";
 import { GiAutoRepair } from "react-icons/gi";
 import { IoSettingsOutline, IoShieldOutline } from "react-icons/io5";
 import { FaUsers } from "react-icons/fa";
+import { IoChatbubbleEllipsesOutline } from "react-icons/io5";
 
 const masterItems = [
   {
@@ -62,6 +63,18 @@ const masterItems = [
         label: "Privacy Policy",
         allowedRoles: ["admin", "user", "serviceProvider"]
         // icon: <FcServices className="text-xl"/>,
+      },
+    ],
+  },
+  {
+    label: "Contact",
+    icon: null,
+    children: [
+      {
+        to: "/dashboard/contact/chat",
+        label: "Chat",
+        icon: <IoChatbubbleEllipsesOutline className="text-xl" />,
+        allowedRoles: ["admin", "user", "serviceProvider"]
       },
     ],
   },

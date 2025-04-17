@@ -4,11 +4,14 @@ import dotenv from "dotenv";
 import authRouter from "./routes/auth.js";
 import servicesRouter from "./routes/services.js";
 import usersRouter from "./routes/users.js";
+import chatRouter from "./routes/chat.js";
 import connectToDatabase from "./db/db.js";
 import { Server } from "socket.io";
 import http from "http";
 import User from "./models/User.js";
 import ServiceProvider from "./models/ServiceProvider.js";
+import Conversation from "./models/Conversation.js";
+import Message from "./models/Message.js";
 
 dotenv.config();
 connectToDatabase();
@@ -30,6 +33,7 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/services", servicesRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/chat", chatRouter);
 
 const connectedUsers = new Map();
 const bookings = new Map();
@@ -386,6 +390,120 @@ io.on("connection", (socket) => {
         bookingId,
         message: "Review submitted successfully",
       });
+    }
+  });
+
+  // Chat related socket events
+  socket.on("markAsRead", async (data) => {
+    try {
+      const { conversationId, userId } = data;
+      if (!conversationId || !userId) return;
+
+      // Mark messages as read
+      await Message.updateMany(
+        { 
+          conversation: conversationId, 
+          sender: { $ne: userId },
+          isRead: false 
+        },
+        { isRead: true }
+      );
+
+      // Reset unread count for this conversation
+      await Conversation.findByIdAndUpdate(conversationId, { unreadCount: 0 });
+
+      // Get the updated conversation
+      const conversation = await Conversation.findById(conversationId);
+      
+      // Notify other participants that messages have been read
+      if (conversation) {
+        // Find the other participant's socket ID
+        let otherParticipantSocketId = null;
+        const otherParticipantId = conversation.user && conversation.user.toString() !== userId 
+          ? conversation.user.toString() 
+          : conversation.serviceProvider ? conversation.serviceProvider.toString() : null;
+        
+        if (otherParticipantId) {
+          for (const [socketId, info] of connectedUsers) {
+            if (info.userId === otherParticipantId) {
+              otherParticipantSocketId = socketId;
+              break;
+            }
+          }
+        }
+
+        if (otherParticipantSocketId) {
+          io.to(otherParticipantSocketId).emit("messagesRead", { conversationId });
+        }
+      }
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+    }
+  });
+
+  // Handle new message sending via socket
+  socket.on("sendMessage", async (messageData) => {
+    try {
+      const { conversationId, content } = messageData;
+      const socketUser = connectedUsers.get(socket.id);
+      
+      if (!socketUser || !conversationId || !content) return;
+      
+      const { userId, role } = socketUser;
+
+      // Create the new message
+      const newMessage = new Message({
+        conversation: conversationId,
+        sender: userId,
+        senderType: role,
+        content: content,
+        isRead: false
+      });
+
+      await newMessage.save();
+
+      // Update conversation with last message and increment unread count
+      const conversation = await Conversation.findByIdAndUpdate(
+        conversationId,
+        {
+          lastMessage: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
+          $inc: { unreadCount: 1 }
+        },
+        { new: true }
+      );
+
+      // Populate the message before broadcasting
+      const populatedMessage = await Message.findById(newMessage._id);
+
+      // Broadcast the message to all participants in the conversation
+      if (conversation) {
+        // Determine recipients
+        const recipientIds = [];
+        if (conversation.user) recipientIds.push(conversation.user.toString());
+        if (conversation.serviceProvider) recipientIds.push(conversation.serviceProvider.toString());
+        
+        // Add admin users if needed
+        const adminUsers = await User.find({ role: "admin" }).select("_id");
+        adminUsers.forEach(admin => recipientIds.push(admin._id.toString()));
+        
+        // Filter out duplicates and the sender
+        const uniqueRecipients = [...new Set(recipientIds)].filter(id => id !== userId);
+        
+        // Find socket IDs for all recipients
+        for (const recipientId of uniqueRecipients) {
+          for (const [socketId, info] of connectedUsers) {
+            if (info.userId === recipientId) {
+              io.to(socketId).emit("newMessage", populatedMessage);
+            }
+          }
+        }
+        
+        // Also send back to sender for confirmation
+        socket.emit("messageSent", populatedMessage);
+      }
+    } catch (error) {
+      console.error("Error sending message via socket:", error);
+      socket.emit("messageError", { error: "Failed to send message" });
     }
   });
 
