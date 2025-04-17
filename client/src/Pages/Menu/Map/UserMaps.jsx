@@ -902,8 +902,7 @@ const UserMaps = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="font-medium">Service Duration:</span>
-                        <span>{bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1} hour
-                          {(bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1) > 1 ? "s" : ""}</span>
+                        <span>{bookingDetails.maintenanceDetails?.jobDuration || 1} hour</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Hourly Rate:</span>
@@ -911,7 +910,7 @@ const UserMaps = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Service Charge:</span>
-                        <span>Rs. {bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.hourlyCharge || ((bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)}</span>
+                        <span>Rs. {bookingDetails.maintenanceDetails?.hourlyCharge || 200}</span>
                       </div>
                     </div>
 
@@ -936,15 +935,14 @@ const UserMaps = () => {
                     <div className="border-t pt-2">
                       <div className="flex justify-between">
                         <span className="font-medium">Additional Charges:</span>
-                        <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || 300}</span>
+                        <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || 0}</span>
                       </div>
                       <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t">
                         <span>Total Amount:</span>
-                        <span>Rs. {
-                          (bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.hourlyCharge || ((bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)) +
-                          (bookingDetails.maintenanceDetails?.materialCost || 200) +
-                          (bookingDetails.maintenanceDetails?.additionalCharge || 300)
-                        }</span>
+                        <span>Rs. {bookingDetails.maintenanceDetails?.maintenancePrice || 
+                          ((bookingDetails.maintenanceDetails?.hourlyCharge || 200) + 
+                           (bookingDetails.maintenanceDetails?.materialCost || 0) + 
+                           (bookingDetails.maintenanceDetails?.additionalCharge || 0))}</span>
                       </div>
                     </div>
                   </div>
