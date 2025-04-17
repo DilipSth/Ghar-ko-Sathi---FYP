@@ -157,8 +157,9 @@ const UserMaps = () => {
 
             return {
               id: provider._id,
-              name: provider.name,
+              name: provider.name || "Unknown Provider",
               phone: provider.phoneNo || "N/A",
+              email: provider.email || "N/A",
               services: Array.isArray(provider.services)
                 ? provider.services
                     .map((s) => (typeof s === "object" ? s.ser_name : s))
@@ -175,12 +176,16 @@ const UserMaps = () => {
                 y: 25 + ((index * 10) % 50),
               },
               hourlyRate: 200,
+              profileImage: provider.profileImage || null,
               image: provider.profileImage
                 ? `http://localhost:8000/public/registerImage/${provider.profileImage}`
-                : "/api/placeholder/50/50",
-              rating: (4 + Math.random()).toFixed(1),
-              completedJobs: Math.floor(Math.random() * 200) + 50,
+                : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23e5e7eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E",
+              rating: provider.rating || (4 + Math.random()).toFixed(1),
+              completedJobs: provider.completedJobs || Math.floor(Math.random() * 200) + 50,
               status: provider.approved ? "Active" : "Pending",
+              experience: provider.question || "Experienced Professional",
+              gender: provider.gender || "Not Specified",
+              dob: provider.dob ? new Date(provider.dob).toLocaleDateString() : "Not Specified"
             };
           }
         );
@@ -494,12 +499,12 @@ const UserMaps = () => {
                         <div className="flex items-start space-x-3">
                           <div className="relative w-16 h-16 flex-shrink-0">
                             <img
-                              src={`http://localhost:8000/public/registerImage/${provider.profileImage}`}
+                              src={provider.image}
                               alt={provider.name}
-                              className="w-full h-full rounded-lg object-cover border-2 border-blue-100"
+                              className="w-full h-full rounded-lg object-cover border-2 border-blue-100 bg-gray-100"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = "https://via.placeholder.com/64?text=P";
+                                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23e5e7eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
                               }}
                             />
                             <div className="absolute -bottom-1 -right-1">
@@ -531,7 +536,7 @@ const UserMaps = () => {
                                 {provider.rating}
                               </span>
                               <span className="text-xs text-gray-500 ml-1">
-                                ({provider.completedJobs})
+                                ({provider.completedJobs} jobs)
                               </span>
                             </div>
                             <div className="space-y-0.5">
@@ -542,6 +547,10 @@ const UserMaps = () => {
                               <p className="text-sm text-gray-600">
                                 <span className="font-medium">Phone:</span>{" "}
                                 {provider.phone}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                <span className="font-medium">Experience:</span>{" "}
+                                {provider.experience}
                               </p>
                             </div>
                           </div>
@@ -575,7 +584,7 @@ const UserMaps = () => {
                   className="w-24 h-24 rounded-lg object-cover border-2 border-blue-500"
                   onError={(e) => {
                     e.target.onerror = null;
-                    e.target.src = "https://via.placeholder.com/96?text=Provider";
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23e5e7eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
                   }}
                 />
                 <div>
@@ -906,12 +915,11 @@ const UserMaps = () => {
                       </div>
                     </div>
 
-                    {(bookingDetails.maintenanceDetails?.materials || bookingDetails.materials) && 
-                     (bookingDetails.maintenanceDetails?.materials?.length > 0 || bookingDetails.materials?.length > 0) && (
+                    {bookingDetails.maintenanceDetails?.materials && bookingDetails.maintenanceDetails.materials.length > 0 && (
                       <div className="border-t pt-2">
                         <p className="font-medium mb-2">Materials Used:</p>
                         <div className="space-y-1">
-                          {(bookingDetails.maintenanceDetails?.materials || bookingDetails.materials).map((material, idx) => (
+                          {bookingDetails.maintenanceDetails.materials.map((material, idx) => (
                             <div key={idx} className="flex justify-between text-sm">
                               <span>{material.name}</span>
                               <span>Rs. {material.cost}</span>
@@ -919,7 +927,7 @@ const UserMaps = () => {
                           ))}
                           <div className="flex justify-between font-medium pt-1 border-t">
                             <span>Total Material Cost:</span>
-                            <span>Rs. {bookingDetails.maintenanceDetails?.materialCost || bookingDetails.materialCost || 0}</span>
+                            <span>Rs. {bookingDetails.maintenanceDetails.materialCost || 0}</span>
                           </div>
                         </div>
                       </div>
@@ -928,14 +936,14 @@ const UserMaps = () => {
                     <div className="border-t pt-2">
                       <div className="flex justify-between">
                         <span className="font-medium">Additional Charges:</span>
-                        <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.additionalCharge || 0}</span>
+                        <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || 300}</span>
                       </div>
                       <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t">
                         <span>Total Amount:</span>
                         <span>Rs. {
                           (bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.hourlyCharge || ((bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)) +
-                          (bookingDetails.maintenanceDetails?.materialCost || bookingDetails.materialCost || 0) +
-                          (bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.additionalCharge || 0)
+                          (bookingDetails.maintenanceDetails?.materialCost || 200) +
+                          (bookingDetails.maintenanceDetails?.additionalCharge || 300)
                         }</span>
                       </div>
                     </div>
