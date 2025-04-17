@@ -222,19 +222,31 @@ io.on("connection", (socket) => {
   });
 
   socket.on("updateMaintenanceDetails", (data) => {
-    const { bookingId, maintenanceNotes, maintenancePrice, hourlyCharge, materialCost, additionalCharge, jobDuration, materials } = data;
+    const { bookingId, ...maintenanceDetails } = data;
     const booking = bookings.get(bookingId);
 
     if (booking) {
+      // Calculate the total price components
+      const hourlyCharge = (maintenanceDetails.hourlyCharge || 200);
+      const materialCost = maintenanceDetails.materialCost || 0;
+      const additionalCharge = maintenanceDetails.additionalCharge || 0;
+      const totalPrice = hourlyCharge + materialCost + additionalCharge;
+
+      // Store all maintenance details in the booking object
       booking.maintenanceDetails = {
-        notes: maintenanceNotes,
-        price: maintenancePrice,
-        hourlyCharge,
-        materialCost,
-        additionalCharge,
-        jobDuration,
-        materials
+        jobDuration: maintenanceDetails.jobDuration || 1,
+        hourlyRate: maintenanceDetails.hourlyRate || 200,
+        hourlyCharge: hourlyCharge,
+        materials: maintenanceDetails.materials || [],
+        materialCost: materialCost,
+        additionalCharge: additionalCharge,
+        maintenancePrice: totalPrice,
+        notes: maintenanceDetails.maintenanceNotes || ''
       };
+
+      // Also store in the booking details for backward compatibility
+      booking.details.maintenanceDetails = booking.maintenanceDetails;
+      
       bookings.set(bookingId, booking);
 
       // Notify the user about the updated maintenance details
@@ -266,12 +278,7 @@ io.on("connection", (socket) => {
         
         // Include maintenance details in the completed job data
         if (booking.maintenanceDetails) {
-          booking.details.maintenancePrice = booking.maintenanceDetails.price;
-          booking.details.hourlyCharge = booking.maintenanceDetails.hourlyCharge;
-          booking.details.materialCost = booking.maintenanceDetails.materialCost;
-          booking.details.additionalCharge = booking.maintenanceDetails.additionalCharge;
-          booking.details.jobDuration = booking.maintenanceDetails.jobDuration;
-          booking.details.materials = booking.maintenanceDetails.materials;
+          booking.details.maintenanceDetails = booking.maintenanceDetails;
         }
         
         bookings.set(bookingId, booking);

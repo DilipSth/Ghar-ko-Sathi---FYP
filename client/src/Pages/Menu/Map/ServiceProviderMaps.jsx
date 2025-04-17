@@ -358,31 +358,32 @@ const ServiceProviderMap = () => {
       // Calculate total material cost
       const materialCost = calculateMaterialCost();
       
-      // Calculate total price (hourly charge + material cost + any additional charges)
+      // Parse additional charges (or default to 0 if invalid)
       const additionalCharge = parseFloat(maintenancePrice) || 0;
-      const totalPrice = hourlyCharge + materialCost + additionalCharge;
+      
+      // Calculate total maintenance price (hourly charge + material cost + additional charges)
+      const maintenanceTotal = hourlyCharge + materialCost + additionalCharge;
+      
+      const maintenanceDetails = {
+        jobDuration,
+        hourlyRate,
+        hourlyCharge,
+        materials,
+        materialCost,
+        additionalCharge,
+        maintenancePrice: maintenanceTotal,
+        maintenanceNotes
+      };
       
       socket.emit("updateMaintenanceDetails", {
         bookingId: currentRequest.bookingId,
-        maintenanceNotes,
-        maintenancePrice: totalPrice,
-        hourlyCharge,
-        materialCost,
-        additionalCharge,
-        jobDuration,
-        materials,
+        ...maintenanceDetails
       });
 
       // Update the current request with maintenance details
       setCurrentRequest((prev) => ({
         ...prev,
-        maintenanceNotes,
-        maintenancePrice: totalPrice.toString(),
-        hourlyCharge,
-        materialCost,
-        additionalCharge,
-        jobDuration,
-        materials,
+        maintenanceDetails
       }));
     }
   };

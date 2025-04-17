@@ -902,23 +902,23 @@ const UserMaps = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="font-medium">Service Duration:</span>
-                        <span>{bookingDetails.maintenanceDetails?.jobDuration || 1} hour</span>
+                        <span>{bookingDetails.details?.maintenanceDetails?.jobDuration || 1} hour</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Hourly Rate:</span>
-                        <span>Rs. 200/hour</span>
+                        <span>Rs. {bookingDetails.details?.maintenanceDetails?.hourlyRate || 200}/hour</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Service Charge:</span>
-                        <span>Rs. {bookingDetails.maintenanceDetails?.hourlyCharge || 200}</span>
+                        <span>Rs. {bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200}</span>
                       </div>
                     </div>
 
-                    {bookingDetails.maintenanceDetails?.materials && bookingDetails.maintenanceDetails.materials.length > 0 && (
+                    {bookingDetails.details?.maintenanceDetails?.materials && bookingDetails.details.maintenanceDetails.materials.length > 0 && (
                       <div className="border-t pt-2">
                         <p className="font-medium mb-2">Materials Used:</p>
                         <div className="space-y-1">
-                          {bookingDetails.maintenanceDetails.materials.map((material, idx) => (
+                          {bookingDetails.details.maintenanceDetails.materials.map((material, idx) => (
                             <div key={idx} className="flex justify-between text-sm">
                               <span>{material.name}</span>
                               <span>Rs. {material.cost}</span>
@@ -926,7 +926,7 @@ const UserMaps = () => {
                           ))}
                           <div className="flex justify-between font-medium pt-1 border-t">
                             <span>Total Material Cost:</span>
-                            <span>Rs. {bookingDetails.maintenanceDetails.materialCost || 0}</span>
+                            <span>Rs. {bookingDetails.details.maintenanceDetails.materialCost || 0}</span>
                           </div>
                         </div>
                       </div>
@@ -935,14 +935,14 @@ const UserMaps = () => {
                     <div className="border-t pt-2">
                       <div className="flex justify-between">
                         <span className="font-medium">Additional Charges:</span>
-                        <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || 0}</span>
+                        <span>Rs. {bookingDetails.details?.maintenanceDetails?.additionalCharge || 0}</span>
                       </div>
                       <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t">
                         <span>Total Amount:</span>
-                        <span>Rs. {bookingDetails.maintenanceDetails?.maintenancePrice || 
-                          ((bookingDetails.maintenanceDetails?.hourlyCharge || 200) + 
-                           (bookingDetails.maintenanceDetails?.materialCost || 0) + 
-                           (bookingDetails.maintenanceDetails?.additionalCharge || 0))}</span>
+                        <span>Rs. {bookingDetails.details?.maintenanceDetails?.maintenancePrice || 
+                          ((bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200) + 
+                           (bookingDetails.details?.maintenanceDetails?.materialCost || 0) + 
+                           (bookingDetails.details?.maintenanceDetails?.additionalCharge || 0))}</span>
                       </div>
                     </div>
                   </div>
