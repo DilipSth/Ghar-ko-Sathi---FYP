@@ -64,12 +64,6 @@ const masterItems = [
         allowedRoles: ["admin", "user", "serviceProvider"]
         // icon: <FcServices className="text-xl"/>,
       },
-    ],
-  },
-  {
-    label: "Contact",
-    icon: null,
-    children: [
       {
         to: "/dashboard/contact/chat",
         label: "Chat",
