@@ -69,13 +69,25 @@ const UserMaps = () => {
     socket.on("jobStarted", (booking) => {
       console.log("Job started:", booking);
       setBookingState("ongoing");
-      setBookingDetails(booking);
+      setBookingDetails({ ...booking, jobStartTime: Date.now() });
     });
 
     socket.on("providerCompletedJob", (booking) => {
       console.log("Provider completed job:", booking);
+      const jobEndTime = Date.now();
+      const durationHours = Math.ceil(
+        (jobEndTime - booking.jobStartTime) / (1000 * 60 * 60)
+      );
+      const hourlyCharge = durationHours <= 1 ? 200 : durationHours * 200;
+      const totalCharge = hourlyCharge + (booking.materialCost || 0);
       setBookingState("provider-completed");
-      setBookingDetails(booking);
+      setBookingDetails({
+        ...booking,
+        jobEndTime,
+        durationHours,
+        hourlyCharge,
+        totalCharge,
+      });
     });
 
     socket.on("jobCompleted", (booking) => {
@@ -260,6 +272,7 @@ const UserMaps = () => {
     if (bookingDetails && socket) {
       socket.emit("submitPayment", {
         bookingId: bookingDetails.bookingId,
+        amount: bookingDetails.totalCharge,
       });
     }
   };
@@ -440,7 +453,7 @@ const UserMaps = () => {
                 showDirections={bookingState === "ongoing"}
                 serviceProviders={filteredProviders}
                 onPositionUpdate={(position) => setCurrentPosition(position)}
-                bookingState={bookingState} // Pass booking state
+                bookingState={bookingState}
               />
             </div>
             <div className="h-1/3 overflow-y-auto relative">
@@ -557,21 +570,21 @@ const UserMaps = () => {
                   </div>
                   <div className="mb-4 bg-gray-50 p-3 rounded-lg">
                     <p className="text-sm flex justify-between">
-                      <span className="font-semibold">Phone:</span>
+                      <span className="font-medium">Phone:</span>
                       <span>{selectedProvider.phone}</span>
                     </p>
                     <p className="text-sm flex justify-between">
-                      <span className="font-semibold">Services:</span>
+                      <span className="font-medium">Services:</span>
                       <span className="text-right">
                         {selectedProvider.services}
                       </span>
                     </p>
                     <p className="text-sm flex justify-between">
-                      <span className="font-semibold">Rate:</span>
+                      <span className="font-medium">Rate:</span>
                       <span>Rs {selectedProvider.hourlyRate}/hour</span>
                     </p>
                     <p className="text-sm flex justify-between">
-                      <span className="font-semibold">Status:</span>
+                      <span className="font-medium">Status:</span>
                       <span className="text-green-500 font-medium">
                         {selectedProvider.status}
                       </span>
@@ -934,12 +947,53 @@ const UserMaps = () => {
                         </p>
                       </div>
                       <p className="text-sm">
-                        <span className="font-semibold">Total (2 hrs):</span> Rs
-                        {bookingDetails.details?.totalWage || 400}
+                        <span className="font-semibold">Duration:</span>{" "}
+                        {bookingDetails.jobDuration || bookingDetails.durationHours || 1} hour
+                        {(bookingDetails.jobDuration || bookingDetails.durationHours) > 1 ? "s" : ""}
                       </p>
+                      <div className="bg-blue-50 p-2 rounded">
+                        <p className="text-sm font-medium">Hourly Charge</p>
+                        <p className="text-sm">
+                          {(bookingDetails.jobDuration || bookingDetails.durationHours || 1)} × Rs. 200 = Rs. {bookingDetails.hourlyCharge || ((bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)}
+                        </p>
+                      </div>
+                      {bookingDetails.materials && bookingDetails.materials.length > 0 && (
+                        <div className="bg-gray-50 p-2 rounded">
+                          <p className="text-sm font-medium mb-1">Materials Used:</p>
+                          <ul className="space-y-1">
+                            {bookingDetails.materials.map((material, idx) => (
+                              <li key={idx} className="flex justify-between text-sm">
+                                <span>{material.name}</span>
+                                <span>Rs. {material.cost}</span>
+                              </li>
+                            ))}
+                            <li className="pt-1 border-t text-sm font-medium flex justify-between">
+                              <span>Total Material Cost:</span>
+                              <span>Rs. {bookingDetails.materialCost || 0}</span>
+                            </li>
+                          </ul>
+                        </div>
+                      )}
+                      <div className="bg-yellow-50 p-2 rounded">
+                        <p className="text-sm font-medium">Additional Charges</p>
+                        <p className="text-sm">Rs. {typeof bookingDetails.additionalCharge !== 'undefined' && bookingDetails.additionalCharge !== null ? bookingDetails.additionalCharge : 0}</p>
+                      </div>
+                      <div className="bg-green-50 p-2 rounded">
+                        <p className="text-sm font-medium">Total Price</p>
+                        <p className="text-lg font-bold">
+                          Rs. {
+                            bookingDetails.maintenancePrice && !isNaN(Number(bookingDetails.maintenancePrice))
+                              ? bookingDetails.maintenancePrice
+                              : (
+                                  (bookingDetails.hourlyCharge || ((bookingDetails.jobDuration || bookingDetails.durationHours || 1) * 200)) +
+                                  (bookingDetails.materialCost || 0) +
+                                  (typeof bookingDetails.additionalCharge !== 'undefined' && bookingDetails.additionalCharge !== null ? Number(bookingDetails.additionalCharge) : 0)
+                                )
+                          }
+                        </p>
+                      </div>
                       <p className="text-sm">
                         <span className="font-semibold">Method:</span> Cash
-                        (Static)
                       </p>
                       <p className="text-sm">
                         <span className="font-semibold">Phone:</span>{" "}

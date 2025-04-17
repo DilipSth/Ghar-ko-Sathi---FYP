@@ -82,7 +82,7 @@ const LiveTracking = ({
   serviceProviders = [],
   onPositionUpdate = null,
   setBookingDetails,
-  bookingState, // New prop to track booking status
+  bookingState,
 }) => {
   const [currentPosition, setCurrentPosition] = useState(() => {
     const stored = localStorage.getItem("userCurrentPosition");
@@ -104,7 +104,7 @@ const LiveTracking = ({
   const [trackingStatus, setTrackingStatus] = useState("idle");
   const [previousPositions, setPreviousPositions] = useState([]);
   const [bookingAccepted, setBookingAccepted] = useState(false);
-  const [forceLocationUpdate, setForceLocationUpdate] = useState(false); // Trigger real-time update
+  const [forceLocationUpdate, setForceLocationUpdate] = useState(false);
 
   const markerRef = useRef(null);
   const routeFetchTimeoutRef = useRef(null);
@@ -112,7 +112,7 @@ const LiveTracking = ({
   const lastReconnectAttemptRef = useRef(0);
   const retryCountRef = useRef(0);
   const lastProviderPositionRef = useRef(null);
-  const hasProcessedStoredPositionRef = useRef(true); // Start as true to prevent initial fetch
+  const hasProcessedStoredPositionRef = useRef(true);
 
   const { socket } = useContext(SocketContext) || {};
   const { user } = useAuth() || {};
@@ -313,7 +313,6 @@ const LiveTracking = ({
     setLocationLoading(false);
   }, []);
 
-  // Trigger real-time location update after booking confirmation
   useEffect(() => {
     if (
       bookingState === "accepted" ||
@@ -324,7 +323,6 @@ const LiveTracking = ({
     }
   }, [bookingState]);
 
-  // Handle geolocation
   useEffect(() => {
     let isActive = true;
 
@@ -358,7 +356,7 @@ const LiveTracking = ({
 
     if (forceLocationUpdate) {
       attemptGeolocation();
-      setForceLocationUpdate(false); // Reset trigger
+      setForceLocationUpdate(false);
     }
 
     return () => {
@@ -370,7 +368,6 @@ const LiveTracking = ({
     };
   }, [forceLocationUpdate, updatePosition, handleGeolocationError]);
 
-  // Update location names
   useEffect(() => {
     let isMounted = true;
 
@@ -418,7 +415,6 @@ const LiveTracking = ({
     providerLocationName,
   ]);
 
-  // Handle service provider location updates
   useEffect(() => {
     if (!socket || !user || user?.role === "serviceProvider") return;
 
@@ -473,7 +469,6 @@ const LiveTracking = ({
     };
   }, [socket, user, bookingDetails?.providerId, calculateDistance]);
 
-  // Fetch route after booking
   useEffect(() => {
     if (
       !showDirections &&
@@ -574,7 +569,7 @@ const LiveTracking = ({
     });
     setBookingAccepted(true);
     setShowDirections(true);
-    setForceLocationUpdate(true); // Trigger real-time update
+    setForceLocationUpdate(true);
     addNotification("Booking accepted successfully!", "success");
   };
 
@@ -879,7 +874,7 @@ LiveTracking.propTypes = {
   serviceProviders: PropTypes.array,
   onPositionUpdate: PropTypes.func,
   setBookingDetails: PropTypes.func,
-  bookingState: PropTypes.string, // New prop
+  bookingState: PropTypes.string,
 };
 
 export default LiveTracking;
