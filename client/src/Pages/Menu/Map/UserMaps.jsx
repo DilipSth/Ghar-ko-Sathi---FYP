@@ -901,45 +901,9 @@ const UserMaps = () => {
                             </div>
                           </div>
                           <h3 className="text-xl font-bold text-center">Booking Accepted!</h3>
-                          <p className="text-gray-600 text-center mb-4">
-                            Please confirm to proceed with the service.
-                          </p>
-                          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                            <div className="flex items-center">
-                              <img
-                                src={bookingDetails.details?.providerImage || "https://via.placeholder.com/50"}
-                                alt={bookingDetails.details?.providerName}
-                                className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-blue-500"
-                              />
-                              <div>
-                                <p className="font-semibold">{bookingDetails.details?.providerName}</p>
-                                <p className="text-sm text-gray-600">{bookingDetails.details?.providerServices}</p>
-                              </div>
-                            </div>
-                            <div className="space-y-2 mt-2">
-                              <p className="text-sm">
-                                <span className="font-medium">Description:</span> {bookingDetails.description}
-                              </p>
-                              <p className="text-sm">
-                                <span className="font-medium">Phone:</span> {bookingDetails.details?.providerPhone || "Not provided"}
-                              </p>
-                              
-                              {providerLocation && (
-                                <div className="bg-green-50 p-3 rounded mt-2">
-                                  <p className="text-sm font-medium mb-1">Service Provider Location:</p>
-                                  <p className="text-xs">
-                                    {providerLocation.locationName || 
-                                      `${providerLocation.lat.toFixed(4)}, ${providerLocation.lng.toFixed(4)}`}
-                                  </p>
-                                  {providerDistance && (
-                                    <p className="text-xs mt-1">
-                                      <span className="font-medium">Distance:</span> {providerDistance} km
-                                      {providerEta && <span> • Est. arrival in {providerEta} mins</span>}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                          <div className="text-center mb-4">
+                            <p className="font-medium">{selectedProvider.name}</p>
+                            <p className="text-gray-600">{selectedProvider.services}</p>
                           </div>
                           <div className="flex gap-3">
                             <button
@@ -1041,43 +1005,10 @@ const UserMaps = () => {
                           <p className="text-gray-600 text-center mb-4">
                             The service provider is currently working on your request.
                           </p>
-                          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                            <div className="flex items-center">
-                              <img
-                                src={bookingDetails.details?.providerImage || "https://via.placeholder.com/50"}
-                                alt={bookingDetails.details?.providerName}
-                                className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-blue-500"
-                              />
-                              <div className="flex-1">
-                                <div className="flex justify-between items-center">
-                                  <p className="font-semibold">{bookingDetails.details?.providerName}</p>
-                                  <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Working</span>
-                                </div>
-                                <p className="text-sm text-gray-600">{bookingDetails.details?.providerServices}</p>
-                              </div>
-                            </div>
-                            <div className="space-y-2 mt-2">
-                              <p className="text-sm">
-                                <span className="font-medium">Description:</span> {bookingDetails.description}
-                              </p>
-                              <p className="text-sm">
-                                <span className="font-medium">Phone:</span> {bookingDetails.details?.providerPhone || "Not provided"}
-                              </p>
-                              
-                              {providerLocation && (
-                                <div className="bg-green-50 p-3 rounded mt-2">
-                                  <div className="flex justify-between items-center mb-1">
-                                    <p className="text-sm font-medium">Provider Location:</p>
-                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                      On Site
-                                    </span>
-                                  </div>
-                                  <p className="text-xs">
-                                    {providerLocation.locationName || 
-                                      `${providerLocation.lat.toFixed(4)}, ${providerLocation.lng.toFixed(4)}`}
-                                  </p>
-                                </div>
-                              )}
+                          <div className="bg-gray-50 p-4 rounded-lg">
+                            <div className="text-center">
+                              <p className="font-semibold text-lg">{bookingDetails.details?.providerName}</p>
+                              <p className="text-gray-600">{bookingDetails.details?.providerServices}</p>
                             </div>
                           </div>
                         </div>
@@ -1097,16 +1028,9 @@ const UserMaps = () => {
                             The service provider has marked this job as complete. Please confirm.
                           </p>
                           <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                            <div className="flex items-center mb-2">
-                              <img
-                                src={bookingDetails.details?.providerImage || "https://via.placeholder.com/50"}
-                                alt={bookingDetails.details?.providerName}
-                                className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-green-500"
-                              />
-                              <div>
-                                <p className="font-semibold">{bookingDetails.details?.providerName}</p>
-                                <p className="text-sm text-gray-600">{bookingDetails.details?.providerServices}</p>
-                              </div>
+                            <div className="text-center">
+                              <p className="font-semibold text-lg">{bookingDetails.details?.providerName}</p>
+                              <p className="text-gray-600 mb-3">{bookingDetails.details?.providerServices}</p>
                             </div>
                             <div className="space-y-2 pb-3 border-b border-gray-200">
                               <p className="text-sm">

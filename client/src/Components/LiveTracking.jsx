@@ -751,40 +751,6 @@ const LiveTracking = ({
       <NotificationCenter />
       {showAcceptModal && <AcceptBookingModal />}
 
-      {user?.role !== "serviceProvider" && serviceProviderPosition && (
-        <div className="sticky top-0 z-30 mx-auto w-full max-w-md bg-white p-3 rounded-lg shadow-lg mb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div
-                className={`w-3 h-3 rounded-full mr-2 ${
-                  isMoving ? "bg-green-500 animate-pulse" : "bg-yellow-500"
-                }`}
-              ></div>
-              <span className="font-medium">
-                {trackingStatus === "arriving"
-                  ? "Service provider arriving"
-                  : trackingStatus === "active"
-                  ? "Service provider on the way"
-                  : "Tracking service provider"}
-              </span>
-            </div>
-            <div>
-              {distance && <span className="text-sm mr-2">{distance} km</span>}
-              {eta && (
-                <span className="text-sm bg-blue-100 px-2 py-1 rounded">
-                  {eta} min ETA
-                </span>
-              )}
-            </div>
-          </div>
-          {lastUpdateTime && (
-            <div className="text-xs text-gray-500 mt-1">
-              Last updated: {new Date(lastUpdateTime).toLocaleTimeString()}
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="relative flex-grow w-full h-full" style={{ minHeight: "300px" }}>
         {locationLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-20">
