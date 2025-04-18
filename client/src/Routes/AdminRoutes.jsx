@@ -25,6 +25,7 @@ import UserMaps from "../Pages/Menu/Map/UserMaps";
 import Security from "../Pages/Legal/Security";
 import Privacy from "../Pages/Legal/Privacy";
 import Chat from "../Pages/Contact/Chat";
+import BookingConfirmationPage from "../Pages/ServiceProvider/BookingConfirmationPage";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -41,6 +42,18 @@ const AdminRoutes = () => {
         element={
           <PrivateRoutes>
             <PendingApproval />
+          </PrivateRoutes>
+        } 
+      />
+
+      {/* Service Provider Booking Details Route */}
+      <Route 
+        path="/provider/booking/:bookingId" 
+        element={
+          <PrivateRoutes>
+            <RoleBaseRoutes requiredRole={["serviceProvider"]} requireApproval={true}>
+              <BookingConfirmationPage />
+            </RoleBaseRoutes>
           </PrivateRoutes>
         } 
       />

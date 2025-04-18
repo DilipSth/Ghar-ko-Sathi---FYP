@@ -3,10 +3,12 @@ import { useAuth } from '../context/authContext';
 import { useSocket } from '../context/SocketContext';
 import bookingService from '../services/BookingService';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const ProviderBookingManager = () => {
   const { user } = useAuth();
   const { socket } = useSocket();
+  const navigate = useNavigate();
   const [pendingBookings, setPendingBookings] = useState([]);
   const [activeBookings, setActiveBookings] = useState([]);
   const [historyBookings, setHistoryBookings] = useState([]);
@@ -28,6 +30,48 @@ const ProviderBookingManager = () => {
       loadBookings();
     }
   }, [user]);
+
+  // Utility function to extract location query from a booking
+  const getLocationQueryFromBooking = (booking) => {
+    let locationQuery = '';
+    
+    // Try different possible location formats
+    if (booking.userLocation) {
+      if (typeof booking.userLocation === 'string') {
+        locationQuery = booking.userLocation;
+      } else if (booking.userLocation.lat && booking.userLocation.lng) {
+        locationQuery = `${booking.userLocation.lat},${booking.userLocation.lng}`;
+      }
+    } else if (booking.location) {
+      // Try booking.location format
+      if (booking.location.address) {
+        locationQuery = booking.location.address;
+      } else if (booking.location.coordinates && booking.location.coordinates.lat) {
+        locationQuery = `${booking.location.coordinates.lat},${booking.location.coordinates.lng}`;
+      }
+    }
+    
+    // Default to user's address if available
+    if (!locationQuery && booking.userAddress) {
+      locationQuery = booking.userAddress;
+    }
+    
+    return locationQuery;
+  };
+  
+  // Open Google Maps with user's location
+  const navigateToUserLocation = (booking) => {
+    const locationQuery = getLocationQueryFromBooking(booking);
+    
+    // If we don't have a location, show an error
+    if (!locationQuery) {
+      toast.error('User location not available');
+      return;
+    }
+    
+    const encodedAddress = encodeURIComponent(locationQuery);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+  };
 
   const registerSocketHandlers = () => {
     // Setup socket event handlers for real-time updates
@@ -424,21 +468,84 @@ const ProviderBookingManager = () => {
                         
                         <div className="mt-4 flex justify-end space-x-3">
                           {booking.status === 'accepted' && (
-                            <button
-                              onClick={() => startJob(booking)}
-                              className="px-3 py-1 text-sm bg-green-600 rounded-md text-white hover:bg-green-700"
-                            >
-                              Start Job
-                            </button>
+                            <>
+                              <button
+                                onClick={() => navigateToUserLocation(booking)}
+                                className="px-3 py-1 text-sm bg-indigo-600 rounded-md text-white hover:bg-indigo-700 flex items-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Navigate
+                              </button>
+                              <button
+                                onClick={() => navigate(`/provider/booking/${booking.bookingId}`, { state: { booking } })}
+                                className="px-3 py-1 text-sm bg-blue-600 rounded-md text-white hover:bg-blue-700"
+                              >
+                                View Details
+                              </button>
+                              <button
+                                onClick={() => startJob(booking)}
+                                className="px-3 py-1 text-sm bg-green-600 rounded-md text-white hover:bg-green-700"
+                              >
+                                Start Job
+                              </button>
+                            </>
                           )}
                           
                           {booking.status === 'in-progress' && (
-                            <button
-                              onClick={() => completeJob(booking)}
-                              className="px-3 py-1 text-sm bg-purple-600 rounded-md text-white hover:bg-purple-700"
-                            >
-                              Complete Job
-                            </button>
+                            <>
+                              <button
+                                onClick={() => navigateToUserLocation(booking)}
+                                className="px-3 py-1 text-sm bg-indigo-600 rounded-md text-white hover:bg-indigo-700 flex items-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Navigate
+                              </button>
+                              <button
+                                onClick={() => navigate(`/provider/booking/${booking.bookingId}`, { state: { booking } })}
+                                className="px-3 py-1 text-sm bg-blue-600 rounded-md text-white hover:bg-blue-700"
+                              >
+                                View Details
+                              </button>
+                              <button
+                                onClick={() => completeJob(booking)}
+                                className="px-3 py-1 text-sm bg-purple-600 rounded-md text-white hover:bg-purple-700"
+                              >
+                                Complete Job
+                              </button>
+                            </>
+                          )}
+                          
+                          {booking.status === 'confirmed' && (
+                            <>
+                              <button
+                                onClick={() => navigateToUserLocation(booking)}
+                                className="px-3 py-1 text-sm bg-indigo-600 rounded-md text-white hover:bg-indigo-700 flex items-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Navigate
+                              </button>
+                              <button
+                                onClick={() => navigate(`/provider/booking/${booking.bookingId}`, { state: { booking } })}
+                                className="px-3 py-1 text-sm bg-blue-600 rounded-md text-white hover:bg-blue-700"
+                              >
+                                View Details
+                              </button>
+                              <button
+                                onClick={() => startJob(booking)}
+                                className="px-3 py-1 text-sm bg-green-600 rounded-md text-white hover:bg-green-700"
+                              >
+                                Start Job
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>

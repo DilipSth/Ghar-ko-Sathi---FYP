@@ -1003,7 +1003,7 @@ const ServiceProviderMap = () => {
                   </p>
                   {currentRequest.details.description && (
                     <p className="text-sm">
-                      <span className="font-semibold">User's Description:</span>{" "}
+                      <span className="font-semibold">User&apos;s Description:</span>{" "}
                       {currentRequest.details.description}
                     </p>
                   )}
@@ -1021,27 +1021,45 @@ const ServiceProviderMap = () => {
                   />
                 </div>
 
-                {distance && eta && (
-                  <div className="bg-blue-50 p-3 rounded-lg mb-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm font-medium">Distance to user</p>
-                        <p className="text-lg font-bold">{distance} km</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">Estimated arrival</p>
-                        <p className="text-lg font-bold">{eta} minutes</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={startJob}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
-                >
-                  Start Job
-                </button>
+                <div className="flex flex-col space-y-3 mb-4">
+                  <button
+                    onClick={() => {
+                      let destinationQuery = '';
+                      
+                      // Try different formats to get user's location
+                      if (currentRequest.userLocation) {
+                        if (typeof currentRequest.userLocation === 'string') {
+                          destinationQuery = currentRequest.userLocation;
+                        } else if (currentRequest.userLocation.lat && currentRequest.userLocation.lng) {
+                          destinationQuery = `${currentRequest.userLocation.lat},${currentRequest.userLocation.lng}`;
+                        }
+                      } else if (currentRequest.details && currentRequest.details.userLocationName) {
+                        destinationQuery = currentRequest.details.userLocationName;
+                      }
+                      
+                      // If we have a location query, open Google Maps
+                      if (destinationQuery) {
+                        window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationQuery)}`, '_blank');
+                      } else {
+                        // Fallback to a default Google Maps URL if no location is available
+                        window.open('https://www.google.com/maps/dir///@27.6955136,85.344256,15z/data=!4m2!4m1!3e0?entry=ttu&g_ep=EgoyMDI1MDQxNC4xIKXMDSoJLDEwMjExNDU1SAFQAw%3D%3D', '_blank');
+                      }
+                    }}
+                    className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    Open Google Map for Navigation
+                  </button>
+                  
+                  <button
+                    onClick={startJob}
+                    className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+                  >
+                    Start Job
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -12,6 +12,7 @@ import User from "./models/User.js";
 import ServiceProvider from "./models/ServiceProvider.js";
 import Conversation from "./models/Conversation.js";
 import Message from "./models/Message.js";
+import Booking from "./models/Booking.js";
 
 dotenv.config();
 connectToDatabase();
@@ -597,6 +598,41 @@ io.on("connection", (socket) => {
       }
     } catch (error) {
       console.error("Error marking all messages as read via socket:", error);
+    }
+  });
+
+  // Handle booking details request
+  socket.on('getBookingDetails', async ({ bookingId }) => {
+    try {
+      // Find the booking in the database
+      const booking = await Booking.findOne({ 
+        $or: [
+          { bookingId }, 
+          { _id: bookingId }
+        ]
+      })
+      .populate('userId', 'name email phoneNo')
+      .populate('providerId', 'name email phoneNo services');
+      
+      if (!booking) {
+        socket.emit('bookingDetailsResponse', { success: false, message: 'Booking not found' });
+        return;
+      }
+      
+      // Send the booking details back to the client
+      socket.emit('bookingDetailsResponse', { 
+        success: true, 
+        booking: {
+          ...booking.toObject(),
+          bookingId: booking.bookingId || booking._id
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching booking details:', error);
+      socket.emit('bookingDetailsResponse', { 
+        success: false, 
+        message: 'Error fetching booking details' 
+      });
     }
   });
 
