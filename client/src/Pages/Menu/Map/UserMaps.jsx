@@ -17,7 +17,6 @@ const UserMaps = () => {
   const [bookingState, setBookingState] = useState("idle");
   const [bookingDetails, setBookingDetails] = useState(null);
   const [serviceProviders, setServiceProviders] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
@@ -158,8 +157,6 @@ const UserMaps = () => {
   }, [socket]);
 
   const fetchServiceProviders = async () => {
-    setLoading(true);
-    setError(null);
     try {
       const url = selectedService
         ? `http://localhost:8000/api/users/serviceProvider?service=${selectedService}`
@@ -218,8 +215,6 @@ const UserMaps = () => {
       setError(
         err.response?.data?.error || "Failed to fetch service providers"
       );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -626,7 +621,7 @@ const UserMaps = () => {
                     )}
                   </div>
                   
-                  <div className="h-full w-full" style={{ minHeight: "450px", maxHeight: "calc(100vh - 250px)" }}>
+                  <div className="h-full w-full" style={{ minHeight: "500px", height: "calc(100vh - 250px)" }}>
                     <LiveTracking
                       bookingDetails={bookingDetails}
                       showDirections={bookingState === "ongoing" || bookingState === "accepted" || bookingState === "confirmed"}
@@ -639,10 +634,10 @@ const UserMaps = () => {
                 </div>
 
                 {/* Side Panel - Service Providers or Booking Status */}
-                <div className="w-full lg:w-[380px] flex flex-col gap-4 overflow-hidden">
+                <div className="w-full flex flex-col gap-4 overflow-hidden">
                   {/* Service Providers List */}
                   {bookingState === "idle" && !selectedProvider && (
-                    <div className="bg-white rounded-lg shadow-lg p-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+                    <div className="bg-white rounded-lg shadow-lg p-4 max-h-[calc(100vh-240px)] overflow-y-auto">
                       <div className="sticky top-0 bg-white z-10 pb-2 mb-4 border-b">
                         <h3 className="text-xl font-semibold text-gray-800 mb-3">
                           Available Service Providers
@@ -733,10 +728,7 @@ const UserMaps = () => {
                                         <span className="font-medium">Phone:</span>{" "}
                                         {provider.phone}
                                       </p>
-                                      <p className="text-sm text-gray-600">
-                                        <span className="font-medium">Experience:</span>{" "}
-                                        {provider.experience}
-                                      </p>
+                                      
                                     </div>
                                   </div>
                                 </div>
@@ -761,7 +753,7 @@ const UserMaps = () => {
 
                   {/* Selected Provider Details */}
                   {selectedProvider && bookingState === "idle" && (
-                    <div className="bg-white rounded-xl shadow-lg p-6 animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-lg p-6 animate-fade-in max-h-[calc(100vh-240px)] overflow-y-auto">
                       <div className="flex items-start space-x-4 mb-6">
                         <img
                           src={selectedProvider.image}

@@ -1,12 +1,15 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { useAuth } from "../../../context/authContext";
 import { SocketContext } from "../../../context/SocketContext";
 import LiveTracking from "../../../Components/LiveTracking";
-import axios from "axios";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import { useNavigate } from "react-router-dom";
 
 const ServiceProviderMap = () => {
   const { user } = useAuth();
   const { socket } = useContext(SocketContext);
+  const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState("available");
   const [currentRequest, setCurrentRequest] = useState(null);
@@ -14,21 +17,16 @@ const ServiceProviderMap = () => {
   const [serviceHistory, setServiceHistory] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [isAvailable, setIsAvailable] = useState(true);
-  const [locationName, setLocationName] = useState("");
+  const [locationName, setLocationName] = useState("Loading...");
   // Initialize currentPosition from localStorage if available
   const [currentPosition, setCurrentPosition] = useState(() => {
     const savedPosition = localStorage.getItem("serviceProviderPosition");
     return savedPosition ? JSON.parse(savedPosition) : null;
   });
-  const [userPhone, setUserPhone] = useState(() => {
-    // Try to get the user's phone from auth context if available
-    return user?.phoneNo || "";
-  }); // Use actual user number when available
   const [userPosition, setUserPosition] = useState({
     lat: 27.7172,
     lng: 85.324,
   }); // Islington College coordinates
-  const [routeToUser, setRouteToUser] = useState([]);
   const [eta, setEta] = useState(null);
   const [distance, setDistance] = useState(null);
   // Add states for maintenance details
@@ -39,6 +37,8 @@ const ServiceProviderMap = () => {
   const [materials, setMaterials] = useState([]);
   const [materialName, setMaterialName] = useState("");
   const [materialCost, setMaterialCost] = useState("");
+  const [error, setError] = useState(null);
+  const mapRef = useRef(null);
 
   // Calculate distance between two points in kilometers
   const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
@@ -167,7 +167,6 @@ const ServiceProviderMap = () => {
   const viewRequest = (request) => {
     // Get the real user location from the request data
     const userLocation = request.userLocation || request.details.userLocation || userPosition;
-    const userPhone = request.details.userPhone || "";
     
     // When we receive a booking request, first try to get the current location
     navigator.geolocation.getCurrentPosition(
@@ -186,7 +185,6 @@ const ServiceProviderMap = () => {
         // Now set the current request with all location information
         setCurrentRequest({
           ...request,
-          userPhone: userPhone,
           userLocationName: request.details.userLocationName || "Current Location",
           userLocation: userLocation,
           providerLocation: providerLocation
@@ -199,7 +197,6 @@ const ServiceProviderMap = () => {
         // Fall back to last known position if geolocation fails
         setCurrentRequest({
           ...request,
-          userPhone: userPhone,
           userLocationName: request.details.userLocationName || "Current Location",
           userLocation: userLocation
         });
@@ -228,9 +225,6 @@ const ServiceProviderMap = () => {
           setEta(calculateETA(dist));
         }
       }
-
-      // Calculate route to user
-      calculateRouteToUser();
 
       // Accept the booking
       socket.emit("acceptBooking", { bookingId: currentRequest.bookingId });
@@ -339,55 +333,6 @@ const ServiceProviderMap = () => {
     };
   }, [currentPosition]);
 
-  // Separate useEffect for route calculation to prevent infinite loops
-  const calculateRouteToUser = useCallback(async () => {
-    if (!currentPosition || !userPosition) return;
-
-    try {
-      const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${currentPosition.lng},${currentPosition.lat};${userPosition.lng},${userPosition.lat}?overview=full&geometries=geojson`
-      );
-      const data = await response.json();
-
-      if (data.routes && data.routes.length > 0) {
-        const coordinates = data.routes[0].geometry.coordinates.map(
-          (coord) => ({
-            lat: coord[1],
-            lng: coord[0],
-          })
-        );
-
-        setRouteToUser(coordinates);
-
-        // Update distance and ETA based on the route
-        const distanceInKm = (data.routes[0].distance / 1000).toFixed(1);
-        setDistance(distanceInKm);
-        setEta(calculateETA(distanceInKm));
-      }
-    } catch (error) {
-      console.error("Error calculating route:", error);
-      // Fallback to direct line if route calculation fails
-      setRouteToUser([currentPosition, userPosition]);
-
-      // Calculate straight-line distance as fallback
-      const dist = calculateDistance(
-        currentPosition.lat,
-        currentPosition.lng,
-        userPosition.lat,
-        userPosition.lng
-      );
-      setDistance(dist);
-      setEta(calculateETA(dist));
-    }
-  }, [currentPosition, userPosition, calculateDistance, calculateETA]);
-
-  // Call route calculation when positions change
-  useEffect(() => {
-    if (bookingState === "accepted" || bookingState === "confirmed") {
-      calculateRouteToUser();
-    }
-  }, [bookingState, calculateRouteToUser]);
-
   // Function to add a material to the list
   const addMaterial = () => {
     if (materialName && materialCost) {
@@ -452,17 +397,6 @@ const ServiceProviderMap = () => {
       }));
     }
   };
-
-  // Update route when position changes
-  useEffect(() => {
-    if (
-      bookingState === "accepted" ||
-      bookingState === "confirmed" ||
-      bookingState === "ongoing"
-    ) {
-      calculateRouteToUser();
-    }
-  }, [currentPosition, bookingState]);
 
   // Send position updates to user
   useEffect(() => {
@@ -604,6 +538,41 @@ const ServiceProviderMap = () => {
     }
   }, [currentPosition, currentRequest, calculateDistance]);
 
+  const handleBookingAction = async (booking, action) => {
+    if (!booking || !action) return;
+    
+    try {
+      let endpoint = "";
+      let requestData = { bookingId: booking._id };
+      
+      switch (action) {
+        case "accept":
+          endpoint = "http://localhost:8000/api/bookings/accept";
+          break;
+        case "reject":
+          endpoint = "http://localhost:8000/api/bookings/reject";
+          break;
+        case "start":
+          endpoint = "http://localhost:8000/api/bookings/start";
+          break;
+        case "complete":
+          endpoint = "http://localhost:8000/api/bookings/complete";
+          break;
+        default:
+          setError("Invalid action");
+          return;
+      }
+      
+      // API call code would go here
+      
+      // Placeholder instead of calling undefined functions
+      console.log(`Would call endpoint: ${endpoint} with booking ID: ${requestData.bookingId}`);
+    } catch (error) {
+      console.error(`Error ${action}ing booking:`, error);
+      setError(`Failed to ${action} booking`);
+    }
+  };
+
   return (
     <div className="p-4 h-full">
       <div className="bg-white p-4 rounded-lg shadow-md h-full flex flex-col">
@@ -661,9 +630,9 @@ const ServiceProviderMap = () => {
               <div className="h-2/3 w-full rounded overflow-hidden mb-4">
                 {/* Current location indicator at top of map */}
                 <div className="p-3 bg-gray-50 mb-3 rounded-lg shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                    <div className="flex items-center mb-2 sm:mb-0">
+                      <div className="bg-blue-500 text-white p-2 rounded-full mr-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                         </svg>
@@ -673,13 +642,13 @@ const ServiceProviderMap = () => {
                         <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
                       </div>
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-sm mr-2">{isAvailable ? "Available for bookings" : "Unavailable"}</span>
-                      <div className={`w-3 h-3 rounded-full ${isAvailable ? "bg-green-500" : "bg-gray-400"}`}></div>
+                    <div className="flex items-center bg-gray-100 px-3 py-1.5 rounded-full">
+                      <div className={`h-3 w-3 rounded-full ${isAvailable ? "bg-green-500" : "bg-gray-400"} mr-2`}></div>
+                      <span className="text-sm font-medium">{isAvailable ? "Available for bookings" : "Unavailable"}</span>
                     </div>
                   </div>
                 </div>
-                <div className="h-full w-full" style={{ minHeight: "400px", maxHeight: "calc(100vh - 300px)" }}>
+                <div className="h-full w-full" style={{ minHeight: "500px", height: "calc(100vh - 300px)" }}>
                   <LiveTracking
                     bookingDetails={currentRequest}
                     showDirections={bookingState === "ongoing"}
@@ -696,49 +665,52 @@ const ServiceProviderMap = () => {
                         {pendingRequests.map((request) => (
                           <div
                             key={request.bookingId}
-                            className="bg-gray-100 p-3 rounded-lg"
+                            className="bg-gray-100 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                           >
-                            <div className="flex justify-between">
-                              <div className="flex items-start">
-                                <div>
-                                  <h5 className="font-medium">
-                                    {request.details.userName || "Unknown User"}
-                                  </h5>
-                                  <p className="text-sm text-gray-600">
-                                    {request.details.service} - {request.details.issue}
-                                  </p>
-                                  <p className="text-xs text-gray-600">
+                            <div className="flex flex-col sm:flex-row justify-between">
+                              <div className="flex-1">
+                                <h5 className="font-medium text-base">
+                                  {request.details.userName || "Unknown User"}
+                                </h5>
+                                <p className="text-sm text-gray-700 mb-1">
+                                  {request.details.service} - {request.details.issue}
+                                </p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                                  <p>
+                                    <span className="font-medium">Time:</span>{" "}
                                     {new Date(request.details.requestTime).toLocaleTimeString()}
                                   </p>
-                                  <p className="text-xs text-gray-600">
-                                    <span className="font-medium">Phone:</span>{" "}
-                                    {request.details.userPhone || "Not provided"}
-                                  </p>
-                                  <p className="text-xs text-gray-600">
+                                  <p className="col-span-2">
                                     <span className="font-medium">Location:</span>{" "}
                                     {request.details.userLocationName || "Location unavailable"}
                                   </p>
                                   {request.details.description && (
-                                    <p className="text-xs text-gray-600 mt-1">
-                                      <span className="font-medium">Description:</span>{" "}
-                                      {request.details.description}
+                                    <p className="col-span-2 mt-1 bg-white p-2 rounded">
+                                      <span className="font-medium block">Description:</span>{" "}
+                                      <span className="line-clamp-2">{request.details.description}</span>
                                     </p>
                                   )}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => viewRequest(request)}
-                                className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700"
-                              >
-                                View Details
-                              </button>
+                              <div className="mt-3 sm:mt-0 sm:ml-4 flex sm:flex-col justify-end">
+                                <button
+                                  onClick={() => viewRequest(request)}
+                                  className="bg-blue-600 text-white text-sm px-4 py-2 rounded hover:bg-blue-700 w-full"
+                                >
+                                  View Details
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-gray-500">
+                      <div className="text-center py-8 text-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
                         <p>No available requests at the moment</p>
+                        <p className="text-sm mt-1">New requests will appear here</p>
                       </div>
                     )}
                   </div>
@@ -753,25 +725,25 @@ const ServiceProviderMap = () => {
                         {serviceHistory.map((service) => (
                           <div
                             key={service.id}
-                            className="bg-gray-100 p-3 rounded-lg"
+                            className="bg-gray-100 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                           >
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-start">
                               <div>
-                                <h5 className="font-medium">
+                                <h5 className="font-medium text-base">
                                   {service.customer.name}
                                 </h5>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-sm text-gray-700">
                                   {service.service} - {service.issue}
                                 </p>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-600 mt-1">
                                   {service.date}
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="font-medium">
-                                  Rs{service.earnings}
+                                <p className="font-medium text-lg">
+                                  Rs. {service.earnings}
                                 </p>
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded inline-block mt-1">
                                   Completed
                                 </span>
                               </div>
@@ -780,7 +752,10 @@ const ServiceProviderMap = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-gray-500">
+                      <div className="text-center py-8 text-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
                         <p>No service history yet</p>
                       </div>
                     )}
