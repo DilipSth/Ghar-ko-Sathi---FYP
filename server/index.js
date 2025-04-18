@@ -48,8 +48,18 @@ io.on("connection", (socket) => {
   });
 
   socket.on("sendBookingRequest", async (bookingData) => {
-    const { userId, providerId, service, issue, address, description } =
-      bookingData;
+    const { 
+      userId, 
+      providerId, 
+      service, 
+      issue, 
+      description, 
+      userLocation, 
+      userLocationName,
+      userName,
+      userPhone
+    } = bookingData;
+    
     const bookingId = `${userId}-${providerId}-${Date.now()}`;
 
     const user = await User.findById(userId).select("name phoneNo");
@@ -62,15 +72,18 @@ io.on("connection", (socket) => {
       userId,
       providerId,
       status: "pending",
+      // Store the user's real-time location
+      userLocation: userLocation || null,
       details: {
         service, // Still sent from frontend, but we'll override providerServices
         issue,
-        address,
         description,
         requestTime: new Date().toISOString(),
         wagePerHour: 200,
-        userName: user?.name || "Unknown User",
-        userPhone: user?.phoneNo || "Not provided",
+        userName: userName || user?.name || "Unknown User",
+        userPhone: userPhone || user?.phoneNo || "Not provided",
+        // Store the user's location name
+        userLocationName: userLocationName || "Current Location",
         providerName: provider?.name || "Unknown Provider",
         providerServices:
           provider?.services.map((s) => s.ser_name).join(", ") ||

@@ -5,6 +5,9 @@ import LiveTracking from "../../../Components/LiveTracking";
 import axios from "axios";
 
 const ServiceProviderMap = () => {
+  const { user } = useAuth();
+  const { socket } = useContext(SocketContext);
+  
   const [activeTab, setActiveTab] = useState("available");
   const [currentRequest, setCurrentRequest] = useState(null);
   const [bookingState, setBookingState] = useState("idle");
@@ -17,7 +20,10 @@ const ServiceProviderMap = () => {
     const savedPosition = localStorage.getItem("serviceProviderPosition");
     return savedPosition ? JSON.parse(savedPosition) : null;
   });
-  const [userPhone, setUserPhone] = useState("9812345678"); // Default user phone number
+  const [userPhone, setUserPhone] = useState(() => {
+    // Try to get the user's phone from auth context if available
+    return user?.phoneNo || "";
+  }); // Use actual user number when available
   const [userPosition, setUserPosition] = useState({
     lat: 27.7172,
     lng: 85.324,
@@ -33,8 +39,6 @@ const ServiceProviderMap = () => {
   const [materials, setMaterials] = useState([]);
   const [materialName, setMaterialName] = useState("");
   const [materialCost, setMaterialCost] = useState("");
-  const { user } = useAuth();
-  const { socket } = useContext(SocketContext);
 
   // Calculate distance between two points in kilometers
   const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
@@ -64,7 +68,16 @@ const ServiceProviderMap = () => {
 
     // Create a stable reference to the event handlers
     const handleNewBookingRequest = (booking) => {
-      setPendingRequests((prev) => [...prev, booking]);
+      // If the booking includes user location, use it
+      const enhancedBooking = {
+        ...booking,
+        details: {
+          ...booking.details,
+          userLocationName: booking.details.userLocationName || locationName || "Current Location",
+        }
+      };
+      
+      setPendingRequests((prev) => [...prev, enhancedBooking]);
     };
 
     const handleBookingConfirmed = (booking) => {
@@ -98,7 +111,7 @@ const ServiceProviderMap = () => {
       setServiceHistory((prev) => [
         {
           id: booking.bookingId,
-          customer: { name: booking.details.address.split(",")[0] },
+          customer: { name: booking.details.userName || "Unknown User" },
           service: booking.details.service,
           issue: booking.details.issue,
           requestTime: new Date(
@@ -152,13 +165,49 @@ const ServiceProviderMap = () => {
   };
 
   const viewRequest = (request) => {
-    setCurrentRequest({
-      ...request,
-      userPhone: userPhone,
-      userLocationName: "Islington College, Kamal Marg, Kathmandu",
-      userLocation: userPosition,
-    });
-    setBookingState("reviewing");
+    // Get the real user location from the request data
+    const userLocation = request.userLocation || request.details.userLocation || userPosition;
+    const userPhone = request.details.userPhone || "";
+    
+    // When we receive a booking request, first try to get the current location
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const providerLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        
+        // Save current position to localStorage
+        localStorage.setItem("serviceProviderPosition", JSON.stringify(providerLocation));
+        
+        // Update current position state
+        setCurrentPosition(providerLocation);
+        
+        // Now set the current request with all location information
+        setCurrentRequest({
+          ...request,
+          userPhone: userPhone,
+          userLocationName: request.details.userLocationName || "Current Location",
+          userLocation: userLocation,
+          providerLocation: providerLocation
+        });
+        
+        setBookingState("reviewing");
+      },
+      (error) => {
+        console.error("Error getting provider location:", error);
+        // Fall back to last known position if geolocation fails
+        setCurrentRequest({
+          ...request,
+          userPhone: userPhone,
+          userLocationName: request.details.userLocationName || "Current Location",
+          userLocation: userLocation
+        });
+        
+        setBookingState("reviewing");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
   };
 
   const acceptRequest = () => {
@@ -249,20 +298,36 @@ const ServiceProviderMap = () => {
 
     const getLocationName = async () => {
       try {
+        // Add validation to ensure coordinates are defined
+        if (!currentPosition.lat || !currentPosition.lng) {
+          console.error("Invalid coordinates:", currentPosition);
+          setLocationName("Unknown location");
+          return;
+        }
+        
+        // Use the Nominatim API to get a proper location name from coordinates
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentPosition.lat}&lon=${currentPosition.lng}`
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentPosition.lat}&lon=${currentPosition.lng}&zoom=18&addressdetails=1`
         );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch location name: ${response.status}`);
+        }
+        
         const data = await response.json();
-        setLocationName(
-          data.display_name ||
-            `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(
-              4
-            )}`
-        );
+        const displayName = data.display_name || 
+          `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
+        
+        setLocationName(displayName);
       } catch (error) {
-        setLocationName(
-          `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`
-        );
+        console.error("Error getting location name:", error);
+        
+        // Only try to format coordinates if they are valid
+        if (typeof currentPosition.lat === 'number' && typeof currentPosition.lng === 'number') {
+          setLocationName(`${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`);
+        } else {
+          setLocationName("Unknown location");
+        }
       }
     };
 
@@ -401,27 +466,143 @@ const ServiceProviderMap = () => {
 
   // Send position updates to user
   useEffect(() => {
-    if (!socket || !currentPosition || bookingState === "idle") return;
+    let watchId;
 
-    const intervalId = setInterval(() => {
-      if (currentRequest?.bookingId) {
-        // Save position to localStorage before sending update
-        localStorage.setItem(
-          "serviceProviderPosition",
-          JSON.stringify(currentPosition)
+    // Define getLocationName function that can be called from successCallback
+    const getLocationName = async (latitude, longitude) => {
+      try {
+        // Add a check to ensure latitude and longitude are valid
+        if (latitude === undefined || longitude === undefined) {
+          console.error("Invalid coordinates:", latitude, longitude);
+          return;
+        }
+        
+        // Use the Nominatim API to get a proper location name from coordinates
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
         );
-
-        socket.emit("location-update", {
-          userId: user.id,
-          bookingId: currentRequest.bookingId,
-          location: currentPosition,
-          eta: eta,
-        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch location name: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const displayName = data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        setLocationName(displayName);
+      } catch (error) {
+        console.error("Error getting location name:", error);
+        
+        // Only try to format coordinates if they are valid numbers
+        if (typeof latitude === 'number' && typeof longitude === 'number') {
+          setLocationName(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } else {
+          setLocationName("Unknown location");
+        }
       }
-    }, 5000); // Update every 5 seconds
+    };
 
-    return () => clearInterval(intervalId);
-  }, [socket, currentPosition, currentRequest, bookingState, user, eta]);
+    const successCallback = (position) => {
+      const { latitude, longitude } = position.coords;
+      
+      // Set currentPosition as an object with lat/lng properties, not an array
+      setCurrentPosition({
+        lat: latitude,
+        lng: longitude
+      });
+      
+      // Call getLocationName with the coordinates
+      getLocationName(latitude, longitude);
+
+      // Only send location updates when there's an active booking
+      if (bookingState === "accepted" || bookingState === "confirmed" || bookingState === "ongoing") {
+        // Calculate distance and ETA if we have a user booking
+        let distanceToUser = null;
+        let etaToUser = null;
+        
+        if (currentRequest && currentRequest.details && currentRequest.details.userLocation) {
+          const userLat = currentRequest.details.userLocation.lat;
+          const userLng = currentRequest.details.userLocation.lng;
+          
+          // Calculate distance in kilometers
+          distanceToUser = calculateDistance(
+            latitude, 
+            longitude, 
+            userLat, 
+            userLng
+          );
+          
+          // Estimate ETA based on average speed (30 km/h)
+          const averageSpeedKmPerHour = 30;
+          if (distanceToUser) {
+            // Time in minutes = (distance in km / speed in km per hour) * 60
+            etaToUser = Math.round((distanceToUser / averageSpeedKmPerHour) * 60);
+          }
+        }
+        
+        if (socket && currentRequest) {
+          socket.emit("location-update", {
+            bookingId: currentRequest._id || currentRequest.bookingId,
+            location: { lat: latitude, lng: longitude },
+            locationName: locationName,
+            distance: distanceToUser,
+            eta: etaToUser
+          });
+        }
+      }
+    };
+
+    const errorCallback = (error) => {
+      console.error("Error getting location:", error);
+    };
+
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        successCallback,
+        errorCallback,
+        { enableHighAccuracy: true }
+      );
+    }
+
+    return () => {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [bookingState, currentRequest, socket, locationName]);
+
+  // Add these helper functions before the return statement
+  const deg2rad = (deg) => {
+    return deg * (Math.PI/180);
+  }
+
+  // Calculate current distance and ETA
+  const [distanceToUser, setDistanceToUser] = useState(null);
+  const [etaToUser, setEtaToUser] = useState(null);
+
+  // Update distance and ETA whenever position changes
+  useEffect(() => {
+    if (currentPosition && currentRequest?.details?.userLocation) {
+      const userLat = currentRequest.details.userLocation.lat;
+      const userLng = currentRequest.details.userLocation.lng;
+      
+      // Use currentPosition.lat and currentPosition.lng instead of array indices
+      const distance = calculateDistance(
+        currentPosition.lat,
+        currentPosition.lng,
+        userLat,
+        userLng
+      );
+      
+      setDistanceToUser(distance);
+      
+      // Estimate ETA based on average speed (30 km/h)
+      const averageSpeedKmPerHour = 30;
+      if (distance) {
+        // Time in minutes = (distance in km / speed in km per hour) * 60
+        setEtaToUser(Math.round((distance / averageSpeedKmPerHour) * 60));
+      }
+    }
+  }, [currentPosition, currentRequest, calculateDistance]);
 
   return (
     <div className="p-4 h-full">
@@ -478,6 +659,26 @@ const ServiceProviderMap = () => {
           {bookingState === "idle" && (
             <>
               <div className="h-2/3 w-full rounded overflow-hidden mb-4">
+                {/* Current location indicator at top of map */}
+                <div className="p-3 bg-gray-50 mb-3 rounded-lg shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Your Current Location</p>
+                        <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm mr-2">{isAvailable ? "Available for bookings" : "Unavailable"}</span>
+                      <div className={`w-3 h-3 rounded-full ${isAvailable ? "bg-green-500" : "bg-gray-400"}`}></div>
+                    </div>
+                  </div>
+                </div>
                 <div className="h-full w-full" style={{ minHeight: "400px", maxHeight: "calc(100vh - 300px)" }}>
                   <LiveTracking
                     bookingDetails={currentRequest}
@@ -514,8 +715,8 @@ const ServiceProviderMap = () => {
                                     {request.details.userPhone || "Not provided"}
                                   </p>
                                   <p className="text-xs text-gray-600">
-                                    <span className="font-medium">Address:</span>{" "}
-                                    {request.details.address}
+                                    <span className="font-medium">Location:</span>{" "}
+                                    {request.details.userLocationName || "Location unavailable"}
                                   </p>
                                   {request.details.description && (
                                     <p className="text-xs text-gray-600 mt-1">
@@ -613,14 +814,39 @@ const ServiceProviderMap = () => {
             <div className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4 pointer-events-auto">
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-4">Service Request</h3>
+                
+                {/* Location information at top of booking dialog */}
+                <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                  <div className="flex items-center mb-2">
+                    <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Your Location:</p>
+                      <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="bg-green-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">User Location:</p>
+                      <p className="text-sm font-medium">
+                        {currentRequest.details.userLocationName || "Current Location"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="space-y-3 mb-6">
                   <div>
                     <p className="text-sm font-semibold">Issue</p>
                     <p>{currentRequest.details.issue}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">Address</p>
-                    <p>{currentRequest.details.address}</p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold">Service</p>
@@ -628,13 +854,12 @@ const ServiceProviderMap = () => {
                   </div>
                   <div>
                     <p className="text-sm font-semibold">Phone</p>
-                    <p>{currentRequest.userPhone || "9812345678"}</p>
+                    <p>{currentRequest.details.userPhone || currentRequest.userPhone}</p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold">Location</p>
                     <p>
-                      {currentRequest.userLocationName ||
-                        "Islington College, Kamal Marg, Kathmandu"}
+                      {currentRequest.details.userLocationName || currentRequest.userLocationName}
                     </p>
                   </div>
                   {/* Show user's description if available */}
@@ -672,6 +897,35 @@ const ServiceProviderMap = () => {
                 <h3 className="text-xl font-bold mb-4">
                   Waiting for User Confirmation
                 </h3>
+                
+                {/* Location information panel */}
+                <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                  <div className="flex items-center mb-2">
+                    <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Your Location:</p>
+                      <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="bg-green-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">User Location:</p>
+                      <p className="text-sm font-medium">
+                        {currentRequest.details.userLocationName || "Current Location"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <p className="text-gray-600 mb-4">
                   Please wait for the user to confirm the booking.
                 </p>
@@ -681,17 +935,12 @@ const ServiceProviderMap = () => {
                     {currentRequest.details.service}
                   </p>
                   <p className="text-sm">
-                    <span className="font-semibold">Address:</span>{" "}
-                    {currentRequest.details.address}
-                  </p>
-                  <p className="text-sm">
                     <span className="font-semibold">Phone:</span>{" "}
-                    {currentRequest.userPhone || "9812345678"}
+                    {currentRequest.details.userPhone || currentRequest.userPhone}
                   </p>
                   <p className="text-sm">
                     <span className="font-semibold">Location:</span>{" "}
-                    {currentRequest.userLocationName ||
-                      "Islington College, Kamal Marg, Kathmandu"}
+                    {currentRequest.details.userLocationName || currentRequest.userLocationName}
                   </p>
                   {/* Show user's description if available */}
                   {currentRequest.details.description && (
@@ -735,23 +984,47 @@ const ServiceProviderMap = () => {
             <div className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4 pointer-events-auto">
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-4">Booking Confirmed</h3>
+                
+                {/* Location information panel */}
+                <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                  <div className="flex items-center mb-2">
+                    <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Your Location:</p>
+                      <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="bg-green-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">User Location:</p>
+                      <p className="text-sm font-medium">
+                        {currentRequest.details.userLocationName || "Current Location"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="space-y-2 mb-6">
                   <p className="text-sm">
                     <span className="font-semibold">Service:</span>{" "}
                     {currentRequest.details.service}
                   </p>
                   <p className="text-sm">
-                    <span className="font-semibold">Address:</span>{" "}
-                    {currentRequest.details.address}
-                  </p>
-                  <p className="text-sm">
                     <span className="font-semibold">Phone:</span>{" "}
-                    {currentRequest.userPhone || "9812345678"}
+                    {currentRequest.details.userPhone || currentRequest.userPhone}
                   </p>
                   <p className="text-sm">
                     <span className="font-semibold">Location:</span>{" "}
-                    {currentRequest.userLocationName ||
-                      "Islington College, Kamal Marg, Kathmandu"}
+                    {currentRequest.details.userLocationName || currentRequest.userLocationName}
                   </p>
                   {currentRequest.details.description && (
                     <p className="text-sm">
@@ -801,23 +1074,47 @@ const ServiceProviderMap = () => {
             <div className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4 pointer-events-auto">
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-4">Service in Progress</h3>
+                
+                {/* Location information panel */}
+                <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                  <div className="flex items-center mb-2">
+                    <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Your Location:</p>
+                      <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="bg-green-500 text-white p-1 rounded-full mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">User Location:</p>
+                      <p className="text-sm font-medium">
+                        {currentRequest.details.userLocationName || "Current Location"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="space-y-2 mb-4">
                   <p className="text-sm">
                     <span className="font-semibold">Service:</span>{" "}
                     {currentRequest.details.service}
                   </p>
                   <p className="text-sm">
-                    <span className="font-semibold">Address:</span>{" "}
-                    {currentRequest.details.address}
-                  </p>
-                  <p className="text-sm">
                     <span className="font-semibold">Phone:</span>{" "}
-                    {currentRequest.userPhone || "9812345678"}
+                    {currentRequest.details.userPhone || currentRequest.userPhone}
                   </p>
                   <p className="text-sm">
                     <span className="font-semibold">Location:</span>{" "}
-                    {currentRequest.userLocationName ||
-                      "Islington College, Kamal Marg, Kathmandu"}
+                    {currentRequest.details.userLocationName || currentRequest.userLocationName}
                   </p>
                   {currentRequest.details.description && (
                     <p className="text-sm">
@@ -826,6 +1123,7 @@ const ServiceProviderMap = () => {
                     </p>
                   )}
                 </div>
+
                 <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
                   <LiveTracking
                     bookingDetails={{
