@@ -11,6 +11,8 @@ import { useAuth } from "../../../context/authContext";
 import { SocketContext } from "../../../context/SocketContext";
 import LiveTracking from "../../../Components/LiveTracking";
 import { useLocation } from "react-router-dom";
+import { toast } from 'react-toastify';
+import paymentService from "../../../services/PaymentService";
 
 const UserMaps = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -36,6 +38,7 @@ const UserMaps = () => {
   const { socket } = useContext(SocketContext);
   const location = useLocation();
   const selectedService = location.state?.selectedService || null;
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     if (!socket) return;
@@ -350,12 +353,78 @@ const UserMaps = () => {
     }
   };
 
-  const submitPayment = () => {
-    if (bookingDetails && socket) {
-      socket.emit("submitPayment", {
-        bookingId: bookingDetails.bookingId,
-        amount: bookingDetails.totalCharge,
-      });
+  const submitPayment = async (method) => {
+    if (!bookingDetails || !socket) {
+      setError("Booking details not available");
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    
+    try {
+      if (method === 'cash') {
+        // Cash payment - simple socket emit
+        socket.emit("submitPayment", {
+          bookingId: bookingDetails.bookingId,
+          amount: bookingDetails.totalCharge || 
+            bookingDetails.details?.maintenanceDetails?.maintenancePrice || 200,
+          method: 'cash'
+        });
+        
+        toast.success("Cash payment confirmed");
+        setBookingState("paid");
+      } 
+      else if (method === 'esewa') {
+        // eSewa payment - initiate through the payment service
+        try {
+          console.log("Attempting eSewa payment with booking details:", bookingDetails);
+          
+          // First, need to save booking to database via socket
+          socket.emit("saveBookingForPayment", {
+            bookingId: bookingDetails.bookingId,
+            paymentMethod: 'esewa'
+          });
+          
+          // Wait for confirmation before proceeding
+          const bookingSaved = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error("Timeout waiting for booking to save"));
+            }, 5000);
+            
+            socket.once("bookingSaved", (data) => {
+              clearTimeout(timeout);
+              resolve(data);
+            });
+            
+            socket.once("bookingSaveError", (error) => {
+              clearTimeout(timeout);
+              reject(new Error(error.message || "Failed to save booking"));
+            });
+          });
+          
+          console.log("Booking saved for payment:", bookingSaved);
+          
+          // Now initiate eSewa payment with the MongoDB ID
+          const response = await paymentService.initiateEsewaPayment(bookingSaved.mongoId);
+          
+          if (response.success) {
+            // Submit eSewa payment form
+            paymentService.submitEsewaForm(response.paymentUrl, response.formData);
+            toast.info("Processing payment with eSewa. Please complete the payment in the new window.");
+          } else {
+            throw new Error(response.message || "Failed to initiate eSewa payment");
+          }
+        } catch (error) {
+          console.error("eSewa payment error:", error);
+          toast.error(error.message || "Payment processing failed");
+          setError(error.message || "Failed to initiate eSewa payment");
+        }
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+      setError("Payment failed. Please try again.");
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -1121,15 +1190,59 @@ const UserMaps = () => {
                               </div>
                             </div>
                           </div>
-                          <button
-                            onClick={submitPayment}
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium"
-                          >
-                            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Pay Now
-                          </button>
+                          
+                          {/* Payment Options */}
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-center">Select Payment Method</h4>
+                            
+                            {/* Cash Payment Option */}
+                            <button
+                              onClick={() => submitPayment('cash')}
+                              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium disabled:opacity-70 disabled:cursor-not-allowed"
+                              disabled={isProcessingPayment}
+                            >
+                              {isProcessingPayment ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                  </svg>
+                                  Pay with Cash
+                                </>
+                              )}
+                            </button>
+                            
+                            {/* eSewa Payment Option */}
+                            <button
+                              onClick={() => submitPayment('esewa')}
+                              className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center font-medium disabled:opacity-70 disabled:cursor-not-allowed"
+                              disabled={isProcessingPayment}
+                            >
+                              {isProcessingPayment ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                  </svg>
+                                  Pay with eSewa
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       )}
 

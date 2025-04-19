@@ -5,6 +5,7 @@ import authRouter from "./routes/auth.js";
 import servicesRouter from "./routes/services.js";
 import usersRouter from "./routes/users.js";
 import chatRouter from "./routes/chat.js";
+import paymentsRouter from "./routes/payments.js";
 import connectToDatabase from "./db/db.js";
 import { Server } from "socket.io";
 import http from "http";
@@ -35,6 +36,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/services", servicesRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/payments", paymentsRouter);
 
 const connectedUsers = new Map();
 const bookings = new Map();
@@ -632,6 +634,61 @@ io.on("connection", (socket) => {
       socket.emit('bookingDetailsResponse', { 
         success: false, 
         message: 'Error fetching booking details' 
+      });
+    }
+  });
+
+  // Add this new socket event handler right before the disconnect handler
+  socket.on("saveBookingForPayment", async (data) => {
+    try {
+      const { bookingId, paymentMethod } = data;
+      const memoryBooking = bookings.get(bookingId);
+      
+      if (!memoryBooking) {
+        socket.emit("bookingSaveError", { message: "Booking not found in memory" });
+        return;
+      }
+      
+      // Convert in-memory booking to database model
+      const newBooking = new Booking({
+        userId: memoryBooking.userId,
+        providerId: memoryBooking.providerId,
+        serviceType: memoryBooking.details.service || "General Service",
+        durationInHours: memoryBooking.details.maintenanceDetails?.jobDuration || 1,
+        charge: memoryBooking.details.maintenanceDetails?.hourlyCharge || 200,
+        materialsCost: memoryBooking.details.maintenanceDetails?.materialCost || 0,
+        totalCharge: memoryBooking.details.maintenanceDetails?.maintenancePrice || 200,
+        description: memoryBooking.details.description,
+        location: {
+          coordinates: memoryBooking.userLocation,
+          address: memoryBooking.details.userLocationName
+        },
+        startTime: new Date(),
+        status: "completed",
+        paymentMethod: paymentMethod,
+        paymentStatus: "pending",
+        materials: memoryBooking.details.maintenanceDetails?.materials || []
+      });
+      
+      // Set total charge if not explicitly set
+      if (!newBooking.totalCharge) {
+        newBooking.totalCharge = newBooking.charge + (newBooking.materialsCost || 0);
+      }
+      
+      // Save booking to database
+      const savedBooking = await newBooking.save();
+      console.log("Saved booking to database:", savedBooking._id);
+      
+      // Send back the MongoDB ID for the payment process
+      socket.emit("bookingSaved", { 
+        mongoId: savedBooking._id.toString(),
+        message: "Booking saved to database successfully" 
+      });
+      
+    } catch (error) {
+      console.error("Error saving booking to database:", error);
+      socket.emit("bookingSaveError", { 
+        message: error.message || "Failed to save booking to database" 
       });
     }
   });

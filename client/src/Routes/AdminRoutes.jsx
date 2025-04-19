@@ -26,6 +26,8 @@ import Security from "../Pages/Legal/Security";
 import Privacy from "../Pages/Legal/Privacy";
 import Chat from "../Pages/Contact/Chat";
 import BookingConfirmationPage from "../Pages/ServiceProvider/BookingConfirmationPage";
+import PaymentSuccess from "../Pages/Payment/PaymentSuccess";
+import PaymentError from "../Pages/Payment/PaymentError";
 
 const AdminRoutes = () => {
   const { user } = useAuth();
@@ -44,6 +46,24 @@ const AdminRoutes = () => {
             <PendingApproval />
           </PrivateRoutes>
         } 
+      />
+
+      {/* Payment Routes */}
+      <Route 
+        path="/payments/success" 
+        element={
+          <PrivateRoutes>
+            <PaymentSuccess />
+          </PrivateRoutes>
+        }
+      />
+      <Route 
+        path="/payments/error" 
+        element={
+          <PrivateRoutes>
+            <PaymentError />
+          </PrivateRoutes>
+        }
       />
 
       {/* Service Provider Booking Details Route */}

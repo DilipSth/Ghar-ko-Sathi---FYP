@@ -3,6 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { toast } from 'react-toastify';
+import { useAuth } from '../context/authContext';
+import BookingPaymentSection from './BookingPaymentSection';
 
 // Fix for Leaflet marker icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -45,6 +47,7 @@ const MapCenterUpdater = ({ center }) => {
 };
 
 const BookingDetailsMap = ({ booking, onStartJob }) => {
+  const { user } = useAuth();
   const [userLocation, setUserLocation] = useState(null);
   const [providerLocation, setProviderLocation] = useState(null);
   const mapRef = useRef(null);
@@ -138,7 +141,7 @@ const BookingDetailsMap = ({ booking, onStartJob }) => {
   const mapCenter = getMapCenter();
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg mx-auto">
+    <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       <h2 className="text-xl font-bold mb-4">Booking Confirmed</h2>
       
       <div className="mb-6 bg-blue-50 p-4 rounded-lg">
@@ -239,6 +242,11 @@ const BookingDetailsMap = ({ booking, onStartJob }) => {
           Start Job
         </button>
       </div>
+      
+      {/* Payment Section for Users */}
+      {user.role === 'user' && (
+        <BookingPaymentSection booking={booking} />
+      )}
     </div>
   );
 };

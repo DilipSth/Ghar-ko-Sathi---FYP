@@ -65,6 +65,23 @@ const bookingSchema = new mongoose.Schema({
     enum: ['pending', 'accepted', 'confirmed', 'in-progress', 'completed', 'completed-by-user', 'completed-by-provider', 'paid', 'reviewed', 'cancelled', 'declined'],
     default: 'pending'
   },
+  paymentMethod: {
+    type: String,
+    enum: ['cash', 'esewa', 'none'],
+    default: 'none'
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'completed', 'failed', 'refunded'],
+    default: 'pending'
+  },
+  paymentDetails: {
+    transactionId: String,
+    transactionCode: String,
+    referenceId: String,
+    paidAmount: Number,
+    paidAt: Date
+  },
   rating: {
     type: Number,
     min: 1,

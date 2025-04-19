@@ -453,55 +453,36 @@ class BookingService {
   }
 
   /**
-   * Get a booking by ID
-   * @param {String} bookingId - ID of booking to fetch
+   * Get booking details by ID
+   * @param {String} bookingId - Booking ID
    * @returns {Promise} - Promise with booking details
    */
   getBookingById(bookingId) {
-    // First check the cache
+    // If we have it in cache, return it first for faster UI
     const cachedBooking = this.bookingCache.get(bookingId);
-    if (cachedBooking) {
-      return Promise.resolve(cachedBooking);
-    }
     
-    // If not in cache, fetch from API
+    // Make API call to get latest data
     return axios.get(`${this.API_URL}/bookings/${bookingId}`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`
       }
     })
       .then(response => {
-        if (response.data.success && response.data.booking) {
-          // Save to cache for future use
-          this.saveBookingToCache(response.data.booking);
-          return response.data.booking;
+        if (response.data.success) {
+          const booking = response.data.booking;
+          // Update cache with the latest data
+          this.saveBookingToCache(booking);
+          return booking;
         }
-        return null;
+        throw new Error('Booking not found');
       })
       .catch(error => {
         console.error('Error fetching booking details:', error);
         
-        // Fall back to socket-based approach if API fails
-        if (this.socket) {
-          return new Promise((resolve, reject) => {
-            this.socket.emit('getBookingDetails', { bookingId });
-            
-            // Set up a temporary listener for the response
-            const timeoutId = setTimeout(() => {
-              this.socket.off('bookingDetailsResponse');
-              reject('Request timed out');
-            }, 5000);
-            
-            this.socket.once('bookingDetailsResponse', (data) => {
-              clearTimeout(timeoutId);
-              if (data.booking) {
-                this.saveBookingToCache(data.booking);
-                resolve(data.booking);
-              } else {
-                reject('Booking not found');
-              }
-            });
-          });
+        // Fall back to cached data if available
+        if (cachedBooking) {
+          console.log('Using cached booking data');
+          return cachedBooking;
         }
         
         throw error;
