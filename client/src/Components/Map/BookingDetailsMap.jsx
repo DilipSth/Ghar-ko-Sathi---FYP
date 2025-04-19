@@ -3,8 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { toast } from 'react-toastify';
-import { useAuth } from '../context/authContext';
-import BookingPaymentSection from './BookingPaymentSection';
+import { useAuth } from '../../context/authContext';
+import { BookingPaymentSection } from '../Booking';
 
 // Fix for Leaflet marker icon issue
 delete L.Icon.Default.prototype._getIconUrl;

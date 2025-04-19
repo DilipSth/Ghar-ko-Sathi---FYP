@@ -74,7 +74,7 @@ const handlePaymentReview = (socket, io, connectedUsers, bookings) => {
   // Handle saving booking to database for payment processing
   socket.on("saveBookingForPayment", async (data) => {
     try {
-      const { bookingId, paymentMethod } = data;
+      const { bookingId, paymentMethod, maintenanceDetails: explicitMaintenanceDetails } = data;
       console.log("Saving booking for payment:", { bookingId, paymentMethod });
       
       // First check if this booking ID already exists in the database
@@ -105,12 +105,29 @@ const handlePaymentReview = (socket, io, connectedUsers, bookings) => {
       
       console.log("Memory booking found:", memoryBooking);
       
+      // Determine which maintenance details to use - prioritize explicit ones
+      const useMaintDetails = explicitMaintenanceDetails || 
+                              memoryBooking.maintenanceDetails || 
+                              memoryBooking.details?.maintenanceDetails;
+                              
+      console.log("Using maintenance details:", useMaintDetails);
+      
       // Calculate all charges
-      const hourlyCharge = memoryBooking.details.maintenanceDetails?.hourlyCharge || 200;
-      const materialCost = memoryBooking.details.maintenanceDetails?.materialCost || 0;
-      const additionalCharge = memoryBooking.details.maintenanceDetails?.additionalCharge || 0;
-      const totalCharge = memoryBooking.details.maintenanceDetails?.maintenancePrice || 
-                          (hourlyCharge + materialCost + additionalCharge);
+      const hourlyCharge = useMaintDetails?.hourlyCharge || 200;
+      const materialCost = useMaintDetails?.materialCost || 0;
+      const additionalCharge = useMaintDetails?.additionalCharge || 0;
+      const totalCharge = useMaintDetails?.maintenancePrice || (hourlyCharge + materialCost + additionalCharge);
+      
+      // Get materials from either location
+      const materials = useMaintDetails?.materials || [];
+                        
+      console.log("Payment calculation:", {
+        hourlyCharge,
+        materialCost,
+        additionalCharge,
+        totalCharge,
+        materials
+      });
       
       // Convert in-memory booking to database model
       const newBooking = new Booking({
@@ -118,9 +135,10 @@ const handlePaymentReview = (socket, io, connectedUsers, bookings) => {
         userId: memoryBooking.userId,
         providerId: memoryBooking.providerId,
         serviceType: memoryBooking.details.service || "General Service",
-        durationInHours: memoryBooking.details.maintenanceDetails?.jobDuration || 1,
+        durationInHours: useMaintDetails?.jobDuration || 1,
         charge: hourlyCharge,
         materialsCost: materialCost,
+        additionalCharge: additionalCharge,
         totalCharge: totalCharge,
         description: memoryBooking.details.description,
         location: {
@@ -131,7 +149,7 @@ const handlePaymentReview = (socket, io, connectedUsers, bookings) => {
         status: "completed",
         paymentMethod: paymentMethod,
         paymentStatus: "pending",
-        materials: memoryBooking.details.maintenanceDetails?.materials || [],
+        materials: materials,
         paymentDetails: {
           transactionId: `TXN-${Date.now()}`,
           paidAmount: totalCharge

@@ -9,7 +9,7 @@ import {
 import axios from "axios";
 import { useAuth } from "../../../context/authContext";
 import { SocketContext } from "../../../context/SocketContext";
-import LiveTracking from "../../../Components/LiveTracking";
+import { LiveTracking } from "../../../Components";
 import { useLocation } from "react-router-dom";
 import { toast } from 'react-toastify';
 import paymentService from "../../../services/PaymentService";
@@ -141,7 +141,33 @@ const UserMaps = () => {
 
     socket.on("maintenanceDetailsUpdated", (booking) => {
       console.log("Maintenance details updated:", booking);
-      setBookingDetails(booking);
+      
+      if (!booking || !booking.maintenanceDetails) {
+        console.error("Missing maintenance details in update");
+        return;
+      }
+      
+      // Deep clone current booking details to avoid reference issues
+      const currentDetails = JSON.parse(JSON.stringify(bookingDetails || {}));
+      
+      // Create a new object with combined data, prioritizing the new maintenance details
+      const updatedBookingDetails = {
+        ...currentDetails,
+        details: {
+          ...(currentDetails.details || {}),
+          maintenanceDetails: booking.maintenanceDetails
+        },
+        maintenanceDetails: booking.maintenanceDetails
+      };
+      
+      console.log("Updated booking details:", updatedBookingDetails);
+      
+      // Update state with the new booking details
+      setBookingDetails(updatedBookingDetails);
+      
+      // Show the user a notification with the details
+      const { hourlyCharge, materialCost, additionalCharge, maintenancePrice } = booking.maintenanceDetails;
+      toast.info(`Service details updated: Total Rs. ${maintenancePrice || (hourlyCharge + materialCost + additionalCharge)}`);
     });
 
     return () => {
@@ -362,33 +388,46 @@ const UserMaps = () => {
     setIsProcessingPayment(true);
     
     try {
+      // Log maintenance details before payment
+      console.log("Maintenance details for payment:", {
+        fromDetails: bookingDetails.details?.maintenanceDetails,
+        fromRoot: bookingDetails.maintenanceDetails,
+        calculatedTotal: (
+          (bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200) + 
+          (bookingDetails.maintenanceDetails?.materialCost || bookingDetails.details?.maintenanceDetails?.materialCost || 0) + 
+          (bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.details?.maintenanceDetails?.additionalCharge || 0)
+        )
+      });
+      
       // Always save the booking to database first, regardless of payment method
       console.log("Saving booking to database:", bookingDetails);
           
       // First, save booking to database via socket
-          socket.emit("saveBookingForPayment", {
-            bookingId: bookingDetails.bookingId,
-        paymentMethod: method
-          });
+      socket.emit("saveBookingForPayment", {
+        bookingId: bookingDetails.bookingId,
+        paymentMethod: method,
+        // Include maintenance details explicitly to ensure they're properly saved
+        maintenanceDetails: bookingDetails.maintenanceDetails || bookingDetails.details?.maintenanceDetails
+      });
           
-          // Wait for confirmation before proceeding
-          const bookingSaved = await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-              reject(new Error("Timeout waiting for booking to save"));
+      // Wait for confirmation before proceeding
+      const bookingSaved = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Timeout waiting for booking to save"));
         }, 8000); // Increase timeout to 8 seconds
             
-            socket.once("bookingSaved", (data) => {
-              clearTimeout(timeout);
+        socket.once("bookingSaved", (data) => {
+          clearTimeout(timeout);
           console.log("Booking saved successfully:", data);
-              resolve(data);
-            });
+          resolve(data);
+        });
             
-            socket.once("bookingSaveError", (error) => {
-              clearTimeout(timeout);
+        socket.once("bookingSaveError", (error) => {
+          clearTimeout(timeout);
           console.error("Error saving booking:", error);
-              reject(new Error(error.message || "Failed to save booking"));
-            });
-          });
+          reject(new Error(error.message || "Failed to save booking"));
+        });
+      });
           
       console.log("Booking saved with MongoDB ID:", bookingSaved.mongoId);
       
@@ -1147,23 +1186,24 @@ const UserMaps = () => {
                             <div className="space-y-2">
                               <div className="flex justify-between">
                                 <span className="font-medium">Service Duration:</span>
-                                <span>{bookingDetails.details?.maintenanceDetails?.jobDuration || 1} hour</span>
+                                <span>{bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.details?.maintenanceDetails?.jobDuration || 1} hour</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="font-medium">Hourly Rate:</span>
-                                <span>Rs. {bookingDetails.details?.maintenanceDetails?.hourlyRate || 200}/hour</span>
+                                <span>Rs. {bookingDetails.maintenanceDetails?.hourlyRate || bookingDetails.details?.maintenanceDetails?.hourlyRate || 200}/hour</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="font-medium">Service Charge:</span>
-                                <span>Rs. {bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200}</span>
+                                <span>Rs. {bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200}</span>
                               </div>
                             </div>
 
-                            {bookingDetails.details?.maintenanceDetails?.materials && bookingDetails.details.maintenanceDetails.materials.length > 0 && (
+                            {/* Materials section - check both locations for materials */}
+                            {(bookingDetails.maintenanceDetails?.materials?.length > 0 || bookingDetails.details?.maintenanceDetails?.materials?.length > 0) && (
                               <div className="border-t pt-2">
                                 <p className="font-medium mb-2">Materials Used:</p>
                                 <div className="space-y-1">
-                                  {bookingDetails.details.maintenanceDetails.materials.map((material, idx) => (
+                                  {(bookingDetails.maintenanceDetails?.materials || bookingDetails.details?.maintenanceDetails?.materials || []).map((material, idx) => (
                                     <div key={idx} className="flex justify-between text-sm">
                                       <span>{material.name}</span>
                                       <span>Rs. {material.cost}</span>
@@ -1171,7 +1211,7 @@ const UserMaps = () => {
                                   ))}
                                   <div className="flex justify-between font-medium pt-1 border-t">
                                     <span>Total Material Cost:</span>
-                                    <span>Rs. {bookingDetails.details.maintenanceDetails.materialCost || 0}</span>
+                                    <span>Rs. {bookingDetails.maintenanceDetails?.materialCost || bookingDetails.details?.maintenanceDetails?.materialCost || 0}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1180,14 +1220,17 @@ const UserMaps = () => {
                             <div className="border-t pt-2">
                               <div className="flex justify-between">
                                 <span className="font-medium">Additional Charges:</span>
-                                <span>Rs. {bookingDetails.details?.maintenanceDetails?.additionalCharge || 0}</span>
+                                <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.details?.maintenanceDetails?.additionalCharge || 0}</span>
                               </div>
                               <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t">
                                 <span>Total Amount:</span>
-                                <span>Rs. {bookingDetails.details?.maintenanceDetails?.maintenancePrice || 
-                                  ((bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200) + 
-                                   (bookingDetails.details?.maintenanceDetails?.materialCost || 0) + 
-                                   (bookingDetails.details?.maintenanceDetails?.additionalCharge || 0))}</span>
+                                <span>Rs. {
+                                  bookingDetails.maintenanceDetails?.maintenancePrice || 
+                                  bookingDetails.details?.maintenanceDetails?.maintenancePrice || 
+                                  ((bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200) + 
+                                   (bookingDetails.maintenanceDetails?.materialCost || bookingDetails.details?.maintenanceDetails?.materialCost || 0) + 
+                                   (bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.details?.maintenanceDetails?.additionalCharge || 0))
+                                }</span>
                               </div>
                             </div>
                           </div>

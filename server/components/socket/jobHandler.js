@@ -62,6 +62,14 @@ const handleJobEvents = (socket, io, connectedUsers, bookings) => {
       const additionalCharge = maintenanceDetails.additionalCharge || 0;
       const totalPrice = hourlyCharge + materialCost + additionalCharge;
 
+      console.log("Received maintenance details:", {
+        hourlyCharge,
+        materialCost,
+        additionalCharge,
+        totalPrice,
+        materials: maintenanceDetails.materials
+      });
+
       // Store all maintenance details in the booking object
       booking.maintenanceDetails = {
         jobDuration: maintenanceDetails.jobDuration || 1,
@@ -89,7 +97,18 @@ const handleJobEvents = (socket, io, connectedUsers, bookings) => {
       }
 
       if (userSocketId) {
-        io.to(userSocketId).emit("maintenanceDetailsUpdated", booking);
+        // Create a response object that includes all the necessary data
+        const responseObject = {
+          ...booking,
+          details: {
+            ...booking.details,
+            maintenanceDetails: booking.maintenanceDetails
+          },
+          maintenanceDetails: booking.maintenanceDetails
+        };
+
+        console.log("Sending maintenance details to user:", responseObject.maintenanceDetails);
+        io.to(userSocketId).emit("maintenanceDetailsUpdated", responseObject);
       }
     }
   });

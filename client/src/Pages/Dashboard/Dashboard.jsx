@@ -7,7 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import ReviewForm from "../../Components/ReviewForm";
+import { ReviewForm } from "../../Components";
 
 // Fix Leaflet icon issue
 delete L.Icon.Default.prototype._getIconUrl;

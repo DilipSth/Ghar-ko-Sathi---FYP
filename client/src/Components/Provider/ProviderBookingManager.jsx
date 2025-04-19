@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/authContext';
-import { useSocket } from '../context/SocketContext';
-import bookingService from '../services/BookingService';
+import { useAuth } from '../../context/authContext';
+import { useSocket } from '../../context/useSocket';
+import bookingService from '../../services/BookingService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,6 +15,7 @@ const ProviderBookingManager = () => {
   const [currentTab, setCurrentTab] = useState('pending');
   const [loading, setLoading] = useState(true);
   const [materials, setMaterials] = useState([{ name: '', cost: 0 }]);
+  const [additionalCharge, setAdditionalCharge] = useState(0);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
 
@@ -219,13 +220,27 @@ const ProviderBookingManager = () => {
   };
   
   const completeJob = (booking) => {
+    // Preset materials if they exist in the booking
+    if (booking.maintenanceDetails?.materials && booking.maintenanceDetails.materials.length > 0) {
+      setMaterials(booking.maintenanceDetails.materials);
+    } else {
+      setMaterials([{ name: '', cost: 0 }]);
+    }
+    
+    // Preset additional charge if it exists
+    if (booking.maintenanceDetails?.additionalCharge) {
+      setAdditionalCharge(booking.maintenanceDetails.additionalCharge);
+    } else {
+      setAdditionalCharge(40); // Default additional charge
+    }
+    
     setSelectedBooking(booking);
     setShowMaterialModal(true);
   };
   
   const handleMaterialChange = (index, field, value) => {
     const updatedMaterials = [...materials];
-    updatedMaterials[index][field] = field === 'cost' ? parseFloat(value) : value;
+    updatedMaterials[index][field] = field === 'cost' ? parseFloat(value) || 0 : value;
     setMaterials(updatedMaterials);
   };
   
@@ -239,10 +254,13 @@ const ProviderBookingManager = () => {
   
   const submitJobCompletion = async () => {
     try {
-      if (!selectedBooking) return;
+      if (!selectedBooking || !socket) return;
+      
+      // Filter out empty materials
+      const validMaterials = materials.filter(m => m.name && m.cost > 0);
       
       // Calculate total materials cost
-      const materialsCost = materials.reduce((sum, item) => sum + (item.cost || 0), 0);
+      const materialsCost = validMaterials.reduce((sum, item) => sum + (item.cost || 0), 0);
       
       // Calculate duration (default to scheduled duration or 1 hour)
       const durationHours = selectedBooking.durationHours || 1;
@@ -253,32 +271,69 @@ const ProviderBookingManager = () => {
         durationHours
       );
       
-      const totalCharge = serviceCharge + materialsCost;
+      // Get additional charges from state
+      const additionalChargeValue = parseFloat(additionalCharge) || 0;
       
+      // Calculate total charge
+      const totalCharge = serviceCharge + materialsCost + additionalChargeValue;
+      
+      // First, update the maintenance details via socket
+      const maintenanceDetails = {
+        bookingId: selectedBooking.bookingId,
+        jobDuration: durationHours,
+        hourlyRate: 200, // Base hourly rate
+        hourlyCharge: serviceCharge,
+        materials: validMaterials,
+        materialCost: materialsCost,
+        additionalCharge: additionalChargeValue,
+        maintenancePrice: totalCharge,
+        maintenanceNotes: "Service completed by provider"
+      };
+      
+      console.log("Sending maintenance details:", maintenanceDetails);
+      socket.emit("updateMaintenanceDetails", maintenanceDetails);
+      
+      // Wait a moment for the maintenance details to be processed
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Then mark the job as complete
       await bookingService.completeJobByProvider(selectedBooking.bookingId, {
         duration: durationHours,
-        materials: materials.filter(m => m.name && m.cost > 0),
-        totalCharge
+        materials: validMaterials,
+        materialCost: materialsCost,
+        additionalCharge: additionalChargeValue,
+        totalCharge: totalCharge
       });
       
       toast.success('Job marked as completed');
       
-      // Update booking in UI
+      // Update booking in UI with the maintenance details
       const updatedBooking = {
         ...selectedBooking, 
         status: 'completed-by-provider',
-        totalCharge
+        totalCharge,
+        maintenanceDetails: {
+          jobDuration: durationHours,
+          hourlyRate: 200,
+          hourlyCharge: serviceCharge,
+          materials: validMaterials,
+          materialCost: materialsCost,
+          additionalCharge: additionalChargeValue,
+          maintenancePrice: totalCharge
+        }
       };
+      
       updateBookingStatus(updatedBooking);
       
       // Reset form
       setShowMaterialModal(false);
       setSelectedBooking(null);
       setMaterials([{ name: '', cost: 0 }]);
+      setAdditionalCharge(0);
       
     } catch (error) {
       console.error('Error completing job:', error);
-      toast.error('Failed to complete job');
+      toast.error('Failed to complete job: ' + (error.message || 'Unknown error'));
     }
   };
   
@@ -671,6 +726,18 @@ const ProviderBookingManager = () => {
               </button>
             </div>
             
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Charges (Rs)
+              </label>
+              <input
+                type="number"
+                value={additionalCharge}
+                onChange={(e) => setAdditionalCharge(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            
             <div className="flex justify-end mt-6 space-x-3">
               <button
                 type="button"
@@ -678,6 +745,7 @@ const ProviderBookingManager = () => {
                   setShowMaterialModal(false);
                   setSelectedBooking(null);
                   setMaterials([{ name: '', cost: 0 }]);
+                  setAdditionalCharge(0);
                 }}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700"
               >

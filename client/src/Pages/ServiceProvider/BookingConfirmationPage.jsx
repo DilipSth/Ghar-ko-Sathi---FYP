@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/authContext';
 import { SocketContext } from '../../context/SocketContext';
 import bookingService from '../../services/BookingService';
-import BookingDetailsMap from '../../Components/BookingDetailsMap';
+import { BookingDetailsMap } from '../../Components';
 import { toast } from 'react-toastify';
 
 const BookingConfirmationPage = () => {

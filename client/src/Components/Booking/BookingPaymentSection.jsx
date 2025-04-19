@@ -1,5 +1,5 @@
 import React from 'react';
-import PaymentOptions from './Payment/PaymentOptions';
+import PaymentOptions from '../Payment/PaymentOptions';
 
 const BookingPaymentSection = ({ booking }) => {
   // Check if booking exists and is in the state where payment is needed

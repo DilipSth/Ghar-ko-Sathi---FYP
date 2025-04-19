@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/authContext';
-import { useSocket } from '../context/SocketContext';
-import bookingService from '../services/BookingService';
+import { useAuth } from '../../context/authContext';
+import { useSocket } from '../../context/useSocket';
+import bookingService from '../../services/BookingService';
 import { toast } from 'react-toastify';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';

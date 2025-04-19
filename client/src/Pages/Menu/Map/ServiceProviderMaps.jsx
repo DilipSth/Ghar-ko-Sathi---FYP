@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { useAuth } from "../../../context/authContext";
 import { SocketContext } from "../../../context/SocketContext";
-import LiveTracking from "../../../Components/LiveTracking";
+import { LiveTracking } from "../../../Components";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";

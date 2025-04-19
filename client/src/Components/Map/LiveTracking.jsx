@@ -16,8 +16,8 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { SocketContext } from "../context/SocketContext";
-import { useAuth } from "../context/authContext";
+import { SocketContext } from "../../context/SocketContext";
+import { useAuth } from "../../context/authContext";
 import PropTypes from "prop-types";
 import axios from "axios";
 
