@@ -80,7 +80,6 @@ class PaymentService {
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = paymentUrl;
-    form.target = '_blank';
     form.style.display = 'none';
 
     // Add all required eSewa fields

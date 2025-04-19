@@ -33,7 +33,7 @@ const PaymentOptions = ({ booking }) => {
         if (response.success) {
           // Submit eSewa payment form
           paymentService.submitEsewaForm(response.paymentUrl, response.formData);
-          toast.info('Processing payment with eSewa. Please complete the payment in the new window.');
+          toast.info('Processing payment with eSewa. Please complete the payment process.');
         } else {
           throw new Error(response.message || 'Failed to initiate eSewa payment');
         }

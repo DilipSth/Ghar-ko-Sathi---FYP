@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import paymentService from '../../services/PaymentService';
 import { toast } from 'react-toastify';
+import axios from 'axios';
+import PropTypes from 'prop-types';
 
 // Simple CheckCircle SVG component to replace lucide-react
 const CheckCircle = ({ className }) => (
@@ -22,9 +24,15 @@ const CheckCircle = ({ className }) => (
   </svg>
 );
 
+CheckCircle.propTypes = {
+  className: PropTypes.string
+};
+
 const PaymentSuccess = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [bookingDetails, setBookingDetails] = useState(null);
+  
   const location = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
@@ -43,10 +51,23 @@ const PaymentSuccess = () => {
         const paymentDetails = await paymentService.getPaymentStatus(bookingId);
         console.log('Payment details:', paymentDetails);
         
+        // Get booking details to show provider information
+        try {
+          const response = await axios.get(`/api/bookings/${bookingId}`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          console.log("Booking details response:", response.data);
+          setBookingDetails(response.data.booking);
+        } catch (err) {
+          console.error('Error fetching booking details:', err);
+        }
+        
         // Show success toast
         toast.success('Payment processed successfully!');
         
-        // If we got payment details successfully, we don't need to query booking API
+        // If we got payment details successfully, we don't need to query booking API again
         setLoading(false);
       } catch (error) {
         console.error('Error loading payment details:', error);
@@ -59,13 +80,31 @@ const PaymentSuccess = () => {
   }, [bookingId]);
   
   const handleGoToDashboard = () => {
-    // Navigate to main dashboard
+    // Navigate to main dashboard (not in a new page)
     navigate('/dashboard');
   };
   
   const handleGoToUserMap = () => {
-    // Navigate to user map page
-    navigate('/dashboard/map');
+    // Navigate to user map page (not in a new page)
+    navigate('/dashboard/menu/maps');
+  };
+  
+  const handleGoToReview = () => {
+    // Save the booking information to state or localStorage so that 
+    // the dashboard can access and display the review form
+    localStorage.setItem('showReviewForm', 'true');
+    localStorage.setItem('reviewBookingId', bookingId);
+    
+    if (bookingDetails?.providerId?._id) {
+      localStorage.setItem('reviewProviderId', bookingDetails.providerId._id);
+      localStorage.setItem('reviewProviderName', bookingDetails.providerId.name || 'Service Provider');
+    } else if (bookingDetails?.providerId) {
+      localStorage.setItem('reviewProviderId', bookingDetails.providerId);
+      localStorage.setItem('reviewProviderName', 'Service Provider');
+    }
+    
+    // Navigate to dashboard with the review tab active
+    navigate('/dashboard?showReview=true');
   };
   
   if (loading) {
@@ -109,10 +148,10 @@ const PaymentSuccess = () => {
           
           <div className="space-y-3">
             <button 
-              onClick={handleGoToUserMap}
+              onClick={handleGoToReview}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              Go to Map
+              Write a Review
             </button>
             
             <button 
@@ -120,6 +159,13 @@ const PaymentSuccess = () => {
               className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
             >
               Go to Dashboard
+            </button>
+            
+            <button 
+              onClick={handleGoToUserMap}
+              className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              Go to Map
             </button>
           </div>
         </div>

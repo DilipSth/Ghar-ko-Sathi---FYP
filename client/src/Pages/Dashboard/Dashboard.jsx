@@ -3,10 +3,11 @@ import { MdMiscellaneousServices, MdMyLocation } from "react-icons/md";
 import { useEffect, useState } from "react";
 import PropTypes from 'prop-types';
 import axios from "axios";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import ReviewForm from "../../Components/ReviewForm";
 
 // Fix Leaflet icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,6 +32,7 @@ ChangeView.propTypes = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userCount, setUserCount] = useState(0);
   const [serviceProviderCount, setServiceProviderCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -40,6 +42,7 @@ const Dashboard = () => {
   const [mapLoading, setMapLoading] = useState(true);
   const [locationName, setLocationName] = useState("Loading location...");
   const [activeTab, setActiveTab] = useState('today');
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   // Try to get location name from coordinates
   const getLocationName = async (lat, lng) => {
@@ -120,7 +123,15 @@ const Dashboard = () => {
     };
 
     fetchCounts();
-  }, []);
+    
+    // Check if we should show the review form
+    const params = new URLSearchParams(location.search);
+    const shouldShowReview = params.get('showReview') === 'true' || localStorage.getItem('showReviewForm') === 'true';
+    
+    if (shouldShowReview) {
+      setShowReviewForm(true);
+    }
+  }, [location.search]);
 
   // Center the map on current location
   const centerMap = () => {
@@ -214,8 +225,27 @@ const Dashboard = () => {
     shadowSize: [41, 41]
   });
 
+  // Function to close the review form
+  const handleCloseReview = () => {
+    setShowReviewForm(false);
+    // Clear localStorage
+    localStorage.removeItem('showReviewForm');
+    localStorage.removeItem('reviewBookingId');
+    localStorage.removeItem('reviewProviderId');
+    localStorage.removeItem('reviewProviderName');
+  };
+
   return (
     <div className="p-5 bg-gray-50">
+      {/* Review Form Modal */}
+      {showReviewForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg">
+            <ReviewForm onClose={handleCloseReview} />
+          </div>
+        </div>
+      )}
+      
       <div className="bg-blue-50 border border-blue-200 text-blue-700 p-4 rounded-lg mb-6 shadow-sm">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-blue-600 text-sm opacity-80">Welcome to Ghar Ko Sathi admin panel</p>
