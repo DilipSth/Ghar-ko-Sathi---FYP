@@ -364,32 +364,32 @@ const UserMaps = () => {
     try {
       // Always save the booking to database first, regardless of payment method
       console.log("Saving booking to database:", bookingDetails);
-      
+          
       // First, save booking to database via socket
-      socket.emit("saveBookingForPayment", {
-        bookingId: bookingDetails.bookingId,
+          socket.emit("saveBookingForPayment", {
+            bookingId: bookingDetails.bookingId,
         paymentMethod: method
-      });
-      
-      // Wait for confirmation before proceeding
-      const bookingSaved = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error("Timeout waiting for booking to save"));
+          });
+          
+          // Wait for confirmation before proceeding
+          const bookingSaved = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error("Timeout waiting for booking to save"));
         }, 8000); // Increase timeout to 8 seconds
-        
-        socket.once("bookingSaved", (data) => {
-          clearTimeout(timeout);
+            
+            socket.once("bookingSaved", (data) => {
+              clearTimeout(timeout);
           console.log("Booking saved successfully:", data);
-          resolve(data);
-        });
-        
-        socket.once("bookingSaveError", (error) => {
-          clearTimeout(timeout);
+              resolve(data);
+            });
+            
+            socket.once("bookingSaveError", (error) => {
+              clearTimeout(timeout);
           console.error("Error saving booking:", error);
-          reject(new Error(error.message || "Failed to save booking"));
-        });
-      });
-      
+              reject(new Error(error.message || "Failed to save booking"));
+            });
+          });
+          
       console.log("Booking saved with MongoDB ID:", bookingSaved.mongoId);
       
       if (method === 'cash') {
@@ -605,11 +605,11 @@ const UserMaps = () => {
           </div>
           
           {/* Dashboard Content */}
-          <div className="flex-1 flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 flex flex-col gap-4">
             {activeTab === "map" && (
               <div className="flex-1 flex flex-col lg:flex-row gap-4">
                 {/* Map Section */}
-                <div className="flex-1 overflow-hidden bg-white shadow-md rounded-lg">
+                <div className="flex-1 lg:w-2/3 overflow-hidden bg-white shadow-md rounded-lg">
                   {error && (
                     <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
                       <p>{error}</p>
@@ -691,7 +691,7 @@ const UserMaps = () => {
                     )}
                   </div>
                   
-                  <div className="h-full w-full" style={{ minHeight: "500px", height: "calc(100vh - 250px)" }}>
+                  <div className="h-full w-full" style={{ minHeight: "400px", height: "calc(100vh - 250px)" }}>
                     <LiveTracking
                       bookingDetails={bookingDetails}
                       showDirections={bookingState === "ongoing" || bookingState === "accepted" || bookingState === "confirmed"}
@@ -705,7 +705,7 @@ const UserMaps = () => {
                 </div>
 
                 {/* Side Panel - Service Providers or Booking Status */}
-                <div className="w-full flex flex-col gap-4 overflow-hidden">
+                <div className="w-full lg:w-1/3 flex flex-col gap-4 overflow-hidden">
                   {/* Service Providers List */}
                   {bookingState === "idle" && !selectedProvider && (
                     <div className="bg-white rounded-lg shadow-lg p-4 max-h-[calc(100vh-240px)] overflow-y-auto">
