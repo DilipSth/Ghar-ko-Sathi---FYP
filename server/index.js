@@ -644,22 +644,53 @@ io.on("connection", (socket) => {
   socket.on("saveBookingForPayment", async (data) => {
     try {
       const { bookingId, paymentMethod } = data;
+      console.log("Saving booking for payment:", { bookingId, paymentMethod });
+      
+      // First check if this booking ID already exists in the database
+      const existingBooking = await Booking.findOne({ 
+        $or: [
+          { bookingId }, 
+          { 'paymentDetails.transactionId': bookingId }
+        ]
+      });
+      
+      if (existingBooking) {
+        console.log("Booking already exists in database with ID:", existingBooking._id);
+        // Just return the existing MongoDB ID
+        socket.emit("bookingSaved", { 
+          mongoId: existingBooking._id.toString(),
+          message: "Booking already exists in database" 
+        });
+        return;
+      }
+      
       const memoryBooking = bookings.get(bookingId);
       
       if (!memoryBooking) {
+        console.error("Booking not found in memory:", bookingId);
         socket.emit("bookingSaveError", { message: "Booking not found in memory" });
         return;
       }
       
+      console.log("Memory booking found:", memoryBooking);
+      
+      // Calculate all charges
+      const hourlyCharge = memoryBooking.details.maintenanceDetails?.hourlyCharge || 200;
+      const materialCost = memoryBooking.details.maintenanceDetails?.materialCost || 0;
+      const additionalCharge = memoryBooking.details.maintenanceDetails?.additionalCharge || 0;
+      const totalCharge = memoryBooking.details.maintenanceDetails?.maintenancePrice || 
+                          (hourlyCharge + materialCost + additionalCharge);
+      
       // Convert in-memory booking to database model
       const newBooking = new Booking({
+        bookingId: bookingId, // Store the original bookingId
         userId: memoryBooking.userId,
         providerId: memoryBooking.providerId,
         serviceType: memoryBooking.details.service || "General Service",
         durationInHours: memoryBooking.details.maintenanceDetails?.jobDuration || 1,
-        charge: memoryBooking.details.maintenanceDetails?.hourlyCharge || 200,
-        materialsCost: memoryBooking.details.maintenanceDetails?.materialCost || 0,
-        totalCharge: memoryBooking.details.maintenanceDetails?.maintenancePrice || 200,
+        charge: hourlyCharge,
+        materialsCost: materialCost,
+        totalCharge: totalCharge,
         description: memoryBooking.details.description,
         location: {
           coordinates: memoryBooking.userLocation,
@@ -669,15 +700,15 @@ io.on("connection", (socket) => {
         status: "completed",
         paymentMethod: paymentMethod,
         paymentStatus: "pending",
-        materials: memoryBooking.details.maintenanceDetails?.materials || []
+        materials: memoryBooking.details.maintenanceDetails?.materials || [],
+        paymentDetails: {
+          transactionId: `TXN-${Date.now()}`,
+          paidAmount: totalCharge
+        }
       });
       
-      // Set total charge if not explicitly set
-      if (!newBooking.totalCharge) {
-        newBooking.totalCharge = newBooking.charge + (newBooking.materialsCost || 0);
-      }
-      
       // Save booking to database
+      console.log("Attempting to save booking to database:", newBooking);
       const savedBooking = await newBooking.save();
       console.log("Saved booking to database:", savedBooking._id);
       

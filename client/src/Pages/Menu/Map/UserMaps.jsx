@@ -362,49 +362,49 @@ const UserMaps = () => {
     setIsProcessingPayment(true);
     
     try {
-      if (method === 'cash') {
-        // Cash payment - simple socket emit
-        socket.emit("submitPayment", {
-          bookingId: bookingDetails.bookingId,
-          amount: bookingDetails.totalCharge || 
-            bookingDetails.details?.maintenanceDetails?.maintenancePrice || 200,
-          method: 'cash'
+      // Always save the booking to database first, regardless of payment method
+      console.log("Saving booking to database:", bookingDetails);
+      
+      // First, save booking to database via socket
+      socket.emit("saveBookingForPayment", {
+        bookingId: bookingDetails.bookingId,
+        paymentMethod: method
+      });
+      
+      // Wait for confirmation before proceeding
+      const bookingSaved = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Timeout waiting for booking to save"));
+        }, 8000); // Increase timeout to 8 seconds
+        
+        socket.once("bookingSaved", (data) => {
+          clearTimeout(timeout);
+          console.log("Booking saved successfully:", data);
+          resolve(data);
         });
+        
+        socket.once("bookingSaveError", (error) => {
+          clearTimeout(timeout);
+          console.error("Error saving booking:", error);
+          reject(new Error(error.message || "Failed to save booking"));
+        });
+      });
+      
+      console.log("Booking saved with MongoDB ID:", bookingSaved.mongoId);
+      
+      if (method === 'cash') {
+        // Cash payment - use the MongoDB ID for the payment
+        const response = await paymentService.markAsCashPayment(bookingSaved.mongoId);
+        console.log("Cash payment response:", response);
         
         toast.success("Cash payment confirmed");
         setBookingState("paid");
       } 
       else if (method === 'esewa') {
-        // eSewa payment - initiate through the payment service
+        // eSewa payment - initiate through the payment service using MongoDB ID
         try {
-          console.log("Attempting eSewa payment with booking details:", bookingDetails);
+          console.log("Initiating eSewa payment with MongoDB ID:", bookingSaved.mongoId);
           
-          // First, need to save booking to database via socket
-          socket.emit("saveBookingForPayment", {
-            bookingId: bookingDetails.bookingId,
-            paymentMethod: 'esewa'
-          });
-          
-          // Wait for confirmation before proceeding
-          const bookingSaved = await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-              reject(new Error("Timeout waiting for booking to save"));
-            }, 5000);
-            
-            socket.once("bookingSaved", (data) => {
-              clearTimeout(timeout);
-              resolve(data);
-            });
-            
-            socket.once("bookingSaveError", (error) => {
-              clearTimeout(timeout);
-              reject(new Error(error.message || "Failed to save booking"));
-            });
-          });
-          
-          console.log("Booking saved for payment:", bookingSaved);
-          
-          // Now initiate eSewa payment with the MongoDB ID
           const response = await paymentService.initiateEsewaPayment(bookingSaved.mongoId);
           
           if (response.success) {
@@ -422,7 +422,8 @@ const UserMaps = () => {
       }
     } catch (error) {
       console.error("Payment error:", error);
-      setError("Payment failed. Please try again.");
+      setError("Payment failed. Please try again: " + error.message);
+      toast.error("Payment failed: " + error.message);
     } finally {
       setIsProcessingPayment(false);
     }

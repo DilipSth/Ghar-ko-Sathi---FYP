@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import paymentService from '../../services/PaymentService';
+import { toast } from 'react-toastify';
 
 // Simple CheckCircle SVG component to replace lucide-react
 const CheckCircle = ({ className }) => (
@@ -37,12 +38,15 @@ const PaymentSuccess = () => {
       }
       
       try {
-        // Try to get payment status first
+        console.log('Verifying payment for booking ID:', bookingId);
+        // Try to get payment status
         const paymentDetails = await paymentService.getPaymentStatus(bookingId);
         console.log('Payment details:', paymentDetails);
         
-        // If we got payment details successfully, we don't need to query booking API since
-        // we're just showing a success page
+        // Show success toast
+        toast.success('Payment processed successfully!');
+        
+        // If we got payment details successfully, we don't need to query booking API
         setLoading(false);
       } catch (error) {
         console.error('Error loading payment details:', error);
@@ -55,7 +59,13 @@ const PaymentSuccess = () => {
   }, [bookingId]);
   
   const handleGoToDashboard = () => {
+    // Navigate to main dashboard
     navigate('/dashboard');
+  };
+  
+  const handleGoToUserMap = () => {
+    // Navigate to user map page
+    navigate('/dashboard/map');
   };
   
   if (loading) {
@@ -97,12 +107,21 @@ const PaymentSuccess = () => {
             Your payment has been processed successfully. Thank you for using our service!
           </p>
           
-          <button 
-            onClick={handleGoToDashboard}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Go to Dashboard
-          </button>
+          <div className="space-y-3">
+            <button 
+              onClick={handleGoToUserMap}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Go to Map
+            </button>
+            
+            <button 
+              onClick={handleGoToDashboard}
+              className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Go to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     </div>
