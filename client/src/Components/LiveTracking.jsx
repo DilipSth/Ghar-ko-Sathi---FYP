@@ -83,6 +83,7 @@ const LiveTracking = ({
   onPositionUpdate = null,
   setBookingDetails,
   bookingState,
+  showOnlyUserLocation = false,
 }) => {
   const [currentPosition, setCurrentPosition] = useState(() => {
     const stored = localStorage.getItem("userCurrentPosition");
@@ -806,7 +807,7 @@ const LiveTracking = ({
             </Popup>
           </Marker>
 
-          {user?.role !== "serviceProvider" &&
+          {!showOnlyUserLocation && user?.role !== "serviceProvider" &&
             previousPositions.map((pos, index) => (
               <Marker
                 key={`history-${index}`}
@@ -816,7 +817,7 @@ const LiveTracking = ({
               />
             ))}
 
-          {user?.role !== "serviceProvider" && serviceProviderPosition && (
+          {!showOnlyUserLocation && serviceProviderPosition && bookingDetails && (
             <Marker
               position={{
                 lat: serviceProviderPosition.lat,
@@ -845,7 +846,7 @@ const LiveTracking = ({
             </Marker>
           )}
 
-          {user?.role !== "serviceProvider" &&
+          {!showOnlyUserLocation && user?.role !== "serviceProvider" &&
             (showDirections || bookingAccepted) &&
             routePath.length > 0 && (
               <Polyline
@@ -870,6 +871,7 @@ LiveTracking.propTypes = {
   onPositionUpdate: PropTypes.func,
   setBookingDetails: PropTypes.func,
   bookingState: PropTypes.string,
+  showOnlyUserLocation: PropTypes.bool,
 };
 
 export default LiveTracking;

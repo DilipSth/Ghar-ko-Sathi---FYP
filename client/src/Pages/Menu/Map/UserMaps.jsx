@@ -629,6 +629,7 @@ const UserMaps = () => {
                       onPositionUpdate={(position) => setCurrentPosition(position)}
                       bookingState={bookingState}
                       setBookingDetails={setBookingDetails}
+                      showOnlyUserLocation={true}
                     />
                   </div>
                 </div>
