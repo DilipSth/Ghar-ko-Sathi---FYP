@@ -6,6 +6,7 @@ import servicesRouter from "./routes/services.js";
 import usersRouter from "./routes/users.js";
 import chatRouter from "./routes/chat.js";
 import paymentsRouter from "./routes/payments.js";
+import bookingsRouter from "./routes/bookings.js";
 import connectToDatabase from "./db/db.js";
 import { Server } from "socket.io";
 import http from "http";
@@ -37,6 +38,7 @@ app.use("/api/services", servicesRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/payments", paymentsRouter);
+app.use("/api/bookings", bookingsRouter);
 
 const connectedUsers = new Map();
 const bookings = new Map();

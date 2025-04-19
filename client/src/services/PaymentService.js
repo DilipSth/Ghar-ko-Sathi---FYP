@@ -63,6 +63,13 @@ class PaymentService {
       );
       return response.data;
     } catch (error) {
+      console.error('Payment status error:', error.response?.status, error.response?.data);
+      
+      // If it's a 404, provide a more specific error message
+      if (error.response?.status === 404) {
+        throw 'Payment information not found. The transaction may still be processing.';
+      }
+      
       throw error.response?.data?.message || 'Failed to get payment status';
     }
   }
