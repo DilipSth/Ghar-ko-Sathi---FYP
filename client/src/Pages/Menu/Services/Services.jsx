@@ -11,6 +11,8 @@ const Services = () => {
   const [selectedService, setSelectedService] = useState(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterService, setFilterService] = useState("all");
+  const [allServices, setAllServices] = useState([]);
 
   // Fetch services
   useEffect(() => {
@@ -31,6 +33,7 @@ const Services = () => {
               : null,
           }));
           setServices(data);
+          setAllServices(data);
         }
       } catch (error) {
         console.error("Error fetching services:", error);
@@ -41,6 +44,16 @@ const Services = () => {
 
     fetchServices();
   }, []);
+
+  // Handle service filtering
+  useEffect(() => {
+    if (filterService === "all") {
+      setServices(allServices);
+    } else {
+      const filtered = allServices.filter(service => service._id === filterService);
+      setServices(filtered);
+    }
+  }, [filterService, allServices]);
 
   // Fetch service providers when a service is selected
   useEffect(() => {
@@ -188,12 +201,26 @@ const Services = () => {
         <div>
           <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <h2 className="text-2xl font-bold text-gray-800">Available Services</h2>
-            <button
-              onClick={() => navigate("/dashboard/menu/maps")}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              View All Service Providers
-            </button>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <select
+                value={filterService}
+                onChange={(e) => setFilterService(e.target.value)}
+                className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Services</option>
+                {allServices.map((service) => (
+                  <option key={service._id} value={service._id}>
+                    {service.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => navigate("/dashboard/menu/maps")}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+              >
+                View All Service Providers
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
