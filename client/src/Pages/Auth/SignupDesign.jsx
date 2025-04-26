@@ -1,4 +1,6 @@
 import { NavLink } from "react-router-dom";
+import userImage from "../../assets/Services-folder/software-application.png";
+import serviceProviderImage from "../../assets/Services-folder/maintenance.png";
 
 const SignupDesign = () => {
   return (
@@ -30,33 +32,35 @@ const SignupDesign = () => {
         {/* Signup Cards */}
         <div className="w-full max-w-lg flex justify-between gap-8">
           {/* User Sign Up Card */}
-          <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-6 text-center flex flex-col items-center">
-            <div className="rounded-lg h-32 overflow-hidden mb-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-6 text-center flex flex-col items-center transform transition-all duration-300 hover:shadow-xl hover:scale-105 w-1/2">
+            <div className="rounded-lg h-32 overflow-hidden mb-6 flex items-center justify-center bg-blue-50 p-3 w-full">
               <img
                 alt="User"
-                className="object-cover object-center h-full w-full"
-                src="https://dummyimage.com/1201x501"
+                className="object-contain h-24 w-24 transition-transform duration-500 hover:scale-110"
+                src={userImage}
               />
             </div>
-            <h2 className="text-2xl font-bold  mb-3">User</h2>
-            <NavLink to="/signupUser" className="text-white bg-indigo-500 py-2 px-5 rounded focus:outline-none hover:bg-indigo-600">
+            <h2 className="text-2xl font-bold mb-3 text-blue-600">User</h2>
+            <p className="text-gray-600 text-sm mb-4 h-10">Find and hire skilled professionals for your home needs</p>
+            <NavLink to="/signupUser" className="text-white bg-blue-500 py-2 px-5 rounded-lg focus:outline-none hover:bg-blue-600 transition-colors w-full hover:shadow-md">
               Sign Up
             </NavLink>
           </div>
 
           {/* Service Provider Sign Up Card */}
-          <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-6 text-center flex flex-col items-center">
-            <div className="rounded-lg h-32 overflow-hidden mb-6">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-6 text-center flex flex-col items-center transform transition-all duration-300 hover:shadow-xl hover:scale-105 w-1/2">
+            <div className="rounded-lg h-32 overflow-hidden mb-6 flex items-center justify-center bg-blue-50 p-3 w-full">
               <img
                 alt="Service Provider"
-                className="object-cover object-center h-full w-full"
-                src="https://dummyimage.com/1202x502"
+                className="object-contain h-24 w-24 transition-transform duration-500 hover:scale-110"
+                src={serviceProviderImage}
               />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            <h2 className="text-2xl font-bold mb-3 text-blue-600">
               Service Provider
             </h2>
-            <NavLink to="/signupServiceProvider" className="text-white bg-indigo-500 py-2 px-5 rounded focus:outline-none hover:bg-indigo-600">
+            <p className="text-gray-600 text-sm mb-4 h-10">Offer your services and grow your business</p>
+            <NavLink to="/signupServiceProvider" className="text-white bg-blue-500 py-2 px-5 rounded-lg focus:outline-none hover:bg-blue-600 transition-colors w-full hover:shadow-md">
               Sign Up
             </NavLink>
           </div>

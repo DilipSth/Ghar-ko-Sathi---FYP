@@ -8,7 +8,7 @@ import { useAuth } from "../../context/authContext";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../../context/useSocket";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { toast } from "react-hot-toast";
 
 export default function Header({ toggleSidebar }) {
   const { user, logout } = useAuth();
@@ -113,13 +113,13 @@ export default function Header({ toggleSidebar }) {
         console.log("New message notification added", { sender: senderName, unreadCount: unreadCount + 1 });
         
         // Show toast notification
-        toast.info(`New message from ${senderName}`, {
+        toast.success(`New message from ${senderName}`, {
           position: "top-right",
           autoClose: 3000,
           hideProgressBar: false,
           closeOnClick: true,
           pauseOnHover: true,
-          draggable: true,
+          icon: '👋',
         });
       }
     };
@@ -237,6 +237,28 @@ export default function Header({ toggleSidebar }) {
   }, [user?._id]);
 
   const handleLogout = () => {
+    // Show logout notification based on user role
+    if (user) {
+      const role = user.role;
+      if (role === "admin") {
+        toast.success("Admin logged out successfully", {
+          icon: '👋',
+          duration: 3000,
+        });
+      } else if (role === "serviceProvider") {
+        toast.success("Service provider logged out successfully", {
+          icon: '👋',
+          duration: 3000,
+        });
+      } else {
+        toast.success("Logged out successfully", {
+          icon: '👋',
+          duration: 3000,
+        });
+      }
+    }
+    
+    // Call the logout function from context
     logout();
     navigate("/");
   };

@@ -45,6 +45,18 @@ const UserMaps = () => {
 
     socket.on("bookingAccepted", (booking) => {
       console.log("Booking accepted:", booking);
+      
+      // Show notification when booking is accepted by service provider
+      toast.success(`${booking.providerName || 'Service provider'} has accepted your booking request!`, {
+        duration: 5000,
+        icon: '✅',
+        style: {
+          borderRadius: '10px',
+          background: '#4BB543',
+          color: '#fff',
+        },
+      });
+      
       setBookingState("accepted");
       setBookingDetails(booking);
     });
@@ -91,6 +103,53 @@ const UserMaps = () => {
 
     socket.on("jobCompleted", (booking) => {
       console.log("Job completed:", booking);
+      
+      // Process maintenance details to ensure they're valid
+      if (booking.maintenanceDetails) {
+        const fixedMaintenanceDetails = { ...booking.maintenanceDetails };
+        
+        // Force numeric values for key fields
+        fixedMaintenanceDetails.hourlyCharge = parseFloat(fixedMaintenanceDetails.hourlyCharge) || 200;
+        fixedMaintenanceDetails.additionalCharge = parseFloat(fixedMaintenanceDetails.additionalCharge) || 0;
+        
+        // Process materials and calculate materialCost if needed
+        if (fixedMaintenanceDetails.materials && fixedMaintenanceDetails.materials.length > 0) {
+          fixedMaintenanceDetails.materials = fixedMaintenanceDetails.materials.map(material => ({
+            ...material,
+            cost: parseFloat(material.cost) || 0 
+          }));
+          
+          fixedMaintenanceDetails.materialCost = fixedMaintenanceDetails.materials.reduce(
+            (total, material) => total + (parseFloat(material.cost) || 0), 0
+          );
+        } else {
+          fixedMaintenanceDetails.materialCost = parseFloat(fixedMaintenanceDetails.materialCost) || 0;
+        }
+        
+        // Calculate total price if needed
+        if (!fixedMaintenanceDetails.maintenancePrice) {
+          fixedMaintenanceDetails.maintenancePrice = 
+            fixedMaintenanceDetails.hourlyCharge + 
+            fixedMaintenanceDetails.materialCost + 
+            fixedMaintenanceDetails.additionalCharge;
+        } else {
+          fixedMaintenanceDetails.maintenancePrice = parseFloat(fixedMaintenanceDetails.maintenancePrice) || 0;
+        }
+        
+        booking.maintenanceDetails = fixedMaintenanceDetails;
+      }
+      
+      // Show notification when job is completed
+      toast.success("Service has been completed successfully!", {
+        duration: 5000,
+        icon: '🎉',
+        style: {
+          borderRadius: '10px',
+          background: '#4BB543',
+          color: '#fff',
+        },
+      });
+      
       setBookingState("completed");
       setBookingDetails(booking);
     });
@@ -147,6 +206,43 @@ const UserMaps = () => {
         return;
       }
       
+      // Validate that values are numbers where needed
+      const fixedMaintenanceDetails = { ...booking.maintenanceDetails };
+      
+      // Force numeric values for key fields (with 0 as fallback)
+      fixedMaintenanceDetails.hourlyCharge = parseFloat(fixedMaintenanceDetails.hourlyCharge) || 200;
+      fixedMaintenanceDetails.additionalCharge = parseFloat(fixedMaintenanceDetails.additionalCharge) || 0;
+      
+      // Ensure material cost is calculated if not present but materials are
+      if (fixedMaintenanceDetails.materials && fixedMaintenanceDetails.materials.length > 0) {
+        // Force numeric values for each material cost
+        fixedMaintenanceDetails.materials = fixedMaintenanceDetails.materials.map(material => ({
+          ...material,
+          cost: parseFloat(material.cost) || 0 
+        }));
+        
+        // Recalculate materialCost
+        fixedMaintenanceDetails.materialCost = fixedMaintenanceDetails.materials.reduce(
+          (total, material) => total + (parseFloat(material.cost) || 0), 0
+        );
+      } else if (!fixedMaintenanceDetails.materialCost) {
+        fixedMaintenanceDetails.materialCost = 0;
+      } else {
+        fixedMaintenanceDetails.materialCost = parseFloat(fixedMaintenanceDetails.materialCost) || 0;
+      }
+      
+      // Ensure maintenancePrice is calculated if not present
+      if (!fixedMaintenanceDetails.maintenancePrice) {
+        fixedMaintenanceDetails.maintenancePrice = 
+          fixedMaintenanceDetails.hourlyCharge + 
+          fixedMaintenanceDetails.materialCost + 
+          fixedMaintenanceDetails.additionalCharge;
+      } else {
+        fixedMaintenanceDetails.maintenancePrice = parseFloat(fixedMaintenanceDetails.maintenancePrice) || 0;
+      }
+      
+      console.log("Fixed maintenance details:", fixedMaintenanceDetails);
+      
       // Deep clone current booking details to avoid reference issues
       const currentDetails = JSON.parse(JSON.stringify(bookingDetails || {}));
       
@@ -155,9 +251,9 @@ const UserMaps = () => {
         ...currentDetails,
         details: {
           ...(currentDetails.details || {}),
-          maintenanceDetails: booking.maintenanceDetails
+          maintenanceDetails: fixedMaintenanceDetails
         },
-        maintenanceDetails: booking.maintenanceDetails
+        maintenanceDetails: fixedMaintenanceDetails
       };
       
       console.log("Updated booking details:", updatedBookingDetails);
@@ -166,8 +262,9 @@ const UserMaps = () => {
       setBookingDetails(updatedBookingDetails);
       
       // Show the user a notification with the details
-      const { hourlyCharge, materialCost, additionalCharge, maintenancePrice } = booking.maintenanceDetails;
-      toast.info(`Service details updated: Total Rs. ${maintenancePrice || (hourlyCharge + materialCost + additionalCharge)}`);
+      const { hourlyCharge, materialCost, additionalCharge, maintenancePrice } = fixedMaintenanceDetails;
+      const calculatedTotal = maintenancePrice || (hourlyCharge + materialCost + additionalCharge);
+      toast.info(`Service details updated: Total Rs. ${calculatedTotal}`);
     });
 
     return () => {
@@ -266,6 +363,17 @@ const UserMaps = () => {
   const handleBooking = () => {
     if (selectedProvider && description) {
       try {
+        // Show booking notification immediately
+        toast.success("Service booking request sent successfully!", {
+          duration: 5000,
+          icon: '🔔',
+          style: {
+            borderRadius: '10px',
+            background: '#4BB543',
+            color: '#fff',
+          },
+        });
+        
         setBookingState("waiting");
 
         // Get real-time location data if available
@@ -388,26 +496,54 @@ const UserMaps = () => {
     setIsProcessingPayment(true);
     
     try {
+      // Log booking details for debugging
+      console.log("Full booking details:", JSON.stringify(bookingDetails));
+      
       // Log maintenance details before payment
       console.log("Maintenance details for payment:", {
-        fromDetails: bookingDetails.details?.maintenanceDetails,
-        fromRoot: bookingDetails.maintenanceDetails,
+        hourlyCharge: getMaintenanceValue('hourlyCharge', 200),
+        materialCost: getMaintenanceValue('materialCost', 0),
+        additionalCharge: getMaintenanceValue('additionalCharge', 0),
+        materials: getMaintenanceValue('materials', []),
         calculatedTotal: (
-          (bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200) + 
-          (bookingDetails.maintenanceDetails?.materialCost || bookingDetails.details?.maintenanceDetails?.materialCost || 0) + 
-          (bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.details?.maintenanceDetails?.additionalCharge || 0)
+          getMaintenanceValue('hourlyCharge', 200) + 
+          getMaintenanceValue('materialCost', 0) + 
+          getMaintenanceValue('additionalCharge', 0)
         )
       });
       
+      // Force recalculation of material cost from materials array if it exists
+      let materialCost = 0;
+      const materials = getMaintenanceValue('materials', []);
+      if (materials && materials.length > 0) {
+        materialCost = materials.reduce((total, material) => total + (parseFloat(material.cost) || 0), 0);
+      } else {
+        materialCost = getMaintenanceValue('materialCost', 0);
+      }
+      
+      // Prepare maintenance details for payment with explicitly calculated values
+      const maintenanceDetails = {
+        jobDuration: getMaintenanceValue('jobDuration', 1),
+        hourlyRate: getMaintenanceValue('hourlyRate', 200),
+        hourlyCharge: getMaintenanceValue('hourlyCharge', 200),
+        materials: materials,
+        materialCost: materialCost,
+        additionalCharge: parseFloat(getMaintenanceValue('additionalCharge', 0)),
+        maintenancePrice: getMaintenanceValue('maintenancePrice') || 
+          (getMaintenanceValue('hourlyCharge', 200) + 
+           materialCost + 
+           parseFloat(getMaintenanceValue('additionalCharge', 0)))
+      };
+      
       // Always save the booking to database first, regardless of payment method
-      console.log("Saving booking to database:", bookingDetails);
+      console.log("Saving booking to database with maintenance details:", maintenanceDetails);
           
       // First, save booking to database via socket
       socket.emit("saveBookingForPayment", {
         bookingId: bookingDetails.bookingId,
         paymentMethod: method,
         // Include maintenance details explicitly to ensure they're properly saved
-        maintenanceDetails: bookingDetails.maintenanceDetails || bookingDetails.details?.maintenanceDetails
+        maintenanceDetails: maintenanceDetails
       });
           
       // Wait for confirmation before proceeding
@@ -597,6 +733,38 @@ const UserMaps = () => {
     ];
     setBookingHistory(mockHistory);
   }, []);
+
+  // Utility function to safely extract maintenance data
+  const getMaintenanceValue = (field, defaultValue = 0) => {
+    let value;
+
+    // Try first from maintenanceDetails directly
+    if (bookingDetails?.maintenanceDetails && bookingDetails.maintenanceDetails[field] !== undefined) {
+      value = bookingDetails.maintenanceDetails[field];
+    }
+    // Try from details.maintenanceDetails
+    else if (bookingDetails?.details?.maintenanceDetails && bookingDetails.details.maintenanceDetails[field] !== undefined) {
+      value = bookingDetails.details.maintenanceDetails[field];
+    } 
+    // Special case for materialCost if we have materials array but no materialCost
+    else if (field === 'materialCost') {
+      const materials = getMaintenanceValue('materials', []);
+      if (materials && materials.length > 0) {
+        return materials.reduce((total, material) => total + (parseFloat(material.cost) || 0), 0);
+      }
+      value = defaultValue;
+    }
+    else {
+      value = defaultValue;
+    }
+
+    // For numeric fields, ensure we return a number
+    if (['hourlyCharge', 'hourlyRate', 'materialCost', 'additionalCharge', 'maintenancePrice', 'jobDuration'].includes(field)) {
+      return parseFloat(value) || defaultValue;
+    }
+
+    return value;
+  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -1183,53 +1351,99 @@ const UserMaps = () => {
                             Please review and proceed with payment.
                           </p>
                           <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                            {console.log("Debug payment details:", {
+                              hourlyCharge: getMaintenanceValue('hourlyCharge', 200),
+                              materialCost: getMaintenanceValue('materialCost', 0),
+                              additionalCharge: getMaintenanceValue('additionalCharge', 0),
+                              materials: getMaintenanceValue('materials', []),
+                              maintenancePrice: getMaintenanceValue('maintenancePrice'),
+                              totalCalculated: (
+                                getMaintenanceValue('hourlyCharge', 200) + 
+                                getMaintenanceValue('materialCost', 0) + 
+                                getMaintenanceValue('additionalCharge', 0)
+                              )
+                            })}
                             <div className="space-y-2">
                               <div className="flex justify-between">
                                 <span className="font-medium">Service Duration:</span>
-                                <span>{bookingDetails.maintenanceDetails?.jobDuration || bookingDetails.details?.maintenanceDetails?.jobDuration || 1} hour</span>
+                                <span>{getMaintenanceValue('jobDuration', 1)} hour</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="font-medium">Hourly Rate:</span>
-                                <span>Rs. {bookingDetails.maintenanceDetails?.hourlyRate || bookingDetails.details?.maintenanceDetails?.hourlyRate || 200}/hour</span>
+                                <span>Rs. {getMaintenanceValue('hourlyRate', 200)}/hour</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="font-medium">Service Charge:</span>
-                                <span>Rs. {bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200}</span>
+                                <span>Rs. {getMaintenanceValue('hourlyCharge', 200)}</span>
                               </div>
                             </div>
 
-                            {/* Materials section - check both locations for materials */}
-                            {(bookingDetails.maintenanceDetails?.materials?.length > 0 || bookingDetails.details?.maintenanceDetails?.materials?.length > 0) && (
-                              <div className="border-t pt-2">
-                                <p className="font-medium mb-2">Materials Used:</p>
-                                <div className="space-y-1">
-                                  {(bookingDetails.maintenanceDetails?.materials || bookingDetails.details?.maintenanceDetails?.materials || []).map((material, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                      <span>{material.name}</span>
-                                      <span>Rs. {material.cost}</span>
+                            {/* Material Cost Calculation */}
+                            {(() => {
+                              const materials = getMaintenanceValue('materials', []);
+                              let materialCost = 0;
+                              
+                              if (materials && materials.length > 0) {
+                                materialCost = materials.reduce((total, material) => total + (parseFloat(material.cost) || 0), 0);
+                              } else {
+                                materialCost = getMaintenanceValue('materialCost', 0);
+                              }
+                              
+                              return (
+                                <div className="border-t pt-2">
+                                  <p className="font-medium mb-2">Materials Used:</p>
+                                  {materials.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {materials.map((material, idx) => (
+                                        <div key={idx} className="flex justify-between text-sm">
+                                          <span>{material.name}</span>
+                                          <span>Rs. {material.cost}</span>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
-                                  <div className="flex justify-between font-medium pt-1 border-t">
+                                  ) : (
+                                    <div className="text-sm text-gray-500">No materials added</div>
+                                  )}
+                                  <div className="flex justify-between font-medium pt-1 border-t mt-2">
                                     <span>Total Material Cost:</span>
-                                    <span>Rs. {bookingDetails.maintenanceDetails?.materialCost || bookingDetails.details?.maintenanceDetails?.materialCost || 0}</span>
+                                    <span>Rs. {materialCost}</span>
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
 
                             <div className="border-t pt-2">
                               <div className="flex justify-between">
                                 <span className="font-medium">Additional Charges:</span>
-                                <span>Rs. {bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.details?.maintenanceDetails?.additionalCharge || 0}</span>
+                                <span>Rs. {getMaintenanceValue('additionalCharge', 0)}</span>
                               </div>
                               <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t">
                                 <span>Total Amount:</span>
                                 <span>Rs. {
-                                  bookingDetails.maintenanceDetails?.maintenancePrice || 
-                                  bookingDetails.details?.maintenanceDetails?.maintenancePrice || 
-                                  ((bookingDetails.maintenanceDetails?.hourlyCharge || bookingDetails.details?.maintenanceDetails?.hourlyCharge || 200) + 
-                                   (bookingDetails.maintenanceDetails?.materialCost || bookingDetails.details?.maintenanceDetails?.materialCost || 0) + 
-                                   (bookingDetails.maintenanceDetails?.additionalCharge || bookingDetails.details?.maintenanceDetails?.additionalCharge || 0))
+                                  (() => {
+                                    // Get the maintenance price if available
+                                    const maintenancePrice = getMaintenanceValue('maintenancePrice');
+                                    if (maintenancePrice) return maintenancePrice;
+                                    
+                                    // Otherwise calculate it
+                                    const hourlyCharge = getMaintenanceValue('hourlyCharge', 200);
+                                    
+                                    // Calculate material cost from materials if available
+                                    const materials = getMaintenanceValue('materials', []);
+                                    let materialCost = 0;
+                                    
+                                    if (materials && materials.length > 0) {
+                                      materialCost = materials.reduce((total, material) => total + (parseFloat(material.cost) || 0), 0);
+                                    } else {
+                                      materialCost = getMaintenanceValue('materialCost', 0);
+                                    }
+                                    
+                                    const additionalCharge = parseFloat(getMaintenanceValue('additionalCharge', 0));
+                                    const total = hourlyCharge + materialCost + additionalCharge;
+                                    
+                                    console.log('Calculated detailed total:', { hourlyCharge, materialCost, additionalCharge, total });
+                                    return total;
+                                  })()
                                 }</span>
                               </div>
                             </div>

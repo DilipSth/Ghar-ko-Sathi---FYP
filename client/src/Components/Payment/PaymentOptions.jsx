@@ -57,20 +57,30 @@ const PaymentOptions = ({ booking }) => {
       <div className="mb-6">
         <div className="flex justify-between mb-2">
           <span className="text-gray-600">Service Charge:</span>
-          <span className="font-semibold">Rs. {booking.charge}</span>
+          <span className="font-semibold">Rs. {booking.charge || booking.hourlyCharge || 200}</span>
         </div>
         
-        {booking.materialsCost > 0 && (
+        {(booking.materialsCost > 0 || booking.materialCost > 0) && (
           <div className="flex justify-between mb-2">
             <span className="text-gray-600">Materials Cost:</span>
-            <span className="font-semibold">Rs. {booking.materialsCost}</span>
+            <span className="font-semibold">Rs. {booking.materialsCost || booking.materialCost || 0}</span>
+          </div>
+        )}
+        
+        {(booking.additionalCharge > 0) && (
+          <div className="flex justify-between mb-2">
+            <span className="text-gray-600">Additional Charges:</span>
+            <span className="font-semibold">Rs. {booking.additionalCharge || 0}</span>
           </div>
         )}
         
         <div className="flex justify-between mt-2 pt-2 border-t border-gray-200">
           <span className="text-gray-700 font-semibold">Total Amount:</span>
           <span className="text-lg font-bold text-blue-600">
-            Rs. {booking.totalCharge || (booking.charge + (booking.materialsCost || 0))}
+            Rs. {booking.totalCharge || booking.maintenancePrice || 
+            ((booking.charge || booking.hourlyCharge || 200) + 
+            (booking.materialsCost || booking.materialCost || 0) + 
+            (booking.additionalCharge || 0))}
           </span>
         </div>
       </div>
