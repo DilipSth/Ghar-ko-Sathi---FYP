@@ -31,26 +31,61 @@ const SignupUser = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const data = new FormData();
-    for (const key in formData) {
-      data.append(key, formData[key]);
-    }
-
     try {
+      // Form validation for section 2 fields
+      if (!formData.phoneNo.trim()) {
+        throw new Error("Phone number is required");
+      }
+      
+      // Enhanced password validation - moved to the top for priority
+      if (!formData.password || formData.password.trim() === '') {
+        throw new Error("Password is required");
+      }
+      if (formData.password.length < 6) {
+        throw new Error("Password must be at least 6 characters long");
+      }
+      
+      const data = new FormData();
+      for (const key in formData) {
+        data.append(key, formData[key]);
+      }
+
       const response = await axios.post("http://localhost:8000/api/auth/registerUser", data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      
       if (response.status === 201) {
         toast.success("User Registration successful!");
         navigate("/");
       }
     } catch (error) {
-      toast.error(error.response?.data?.error || "An error occurred during registration.");
+      // Always show the exact error message
+      toast.error(error.message);
+      console.error("Registration error:", error);
     }
   };
 
   const nextSection = () => {
-    setCurrentSection(2);
+    try {
+      // Validate first section fields
+      if (!formData.name.trim()) {
+        throw new Error("Name is required");
+      }
+      if (!formData.email.trim()) {
+        throw new Error("Email is required");
+      }
+      if (!formData.dob) {
+        throw new Error("Date of Birth is required");
+      }
+      if (!formData.gender) {
+        throw new Error("Please select your gender");
+      }
+      
+      // If validation passes, move to next section
+      setCurrentSection(2);
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   const prevSection = () => {

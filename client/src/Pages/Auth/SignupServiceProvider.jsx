@@ -49,12 +49,20 @@ const SignupServiceProvider = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const data = new FormData();
-    for (const key in formData) {
-      data.append(key, formData[key]);
-    }
-
     try {
+      // Validate second section fields
+      if (!formData.services) {
+        throw new Error("Please select at least one service");
+      }
+      if (!formData.question.trim()) {
+        throw new Error("Service description is required");
+      }
+      
+      const data = new FormData();
+      for (const key in formData) {
+        data.append(key, formData[key]);
+      }
+
       const response = await axios.post(
         "http://localhost:8000/api/auth/registerServiceProvider",
         data,
@@ -62,19 +70,50 @@ const SignupServiceProvider = () => {
           headers: { "Content-Type": "multipart/form-data" },
         }
       );
+      
       if (response.status === 201) {
         toast.success("Registration successful admin will notify you soon!");
         navigate("/");
       }
     } catch (error) {
-      toast.error(
-        error.response?.data?.error || "An error occurred during registration."
-      );
+      // Always show the exact error message
+      toast.error(error.message);
+      console.error("Registration error:", error);
     }
   };
 
   const nextSection = () => {
-    setCurrentSection(2);
+    try {
+      // Validate first section fields
+      if (!formData.name.trim()) {
+        throw new Error("Name is required");
+      }
+      if (!formData.email.trim()) {
+        throw new Error("Email is required");
+      }
+      if (!formData.dob) {
+        throw new Error("Date of Birth is required");
+      }
+      if (!formData.gender) {
+        throw new Error("Please select your gender");
+      }
+      if (!formData.phoneNo.trim()) {
+        throw new Error("Phone number is required");
+      }
+      
+      // Enhanced password validation - prioritize this check
+      if (!formData.password || formData.password.trim() === '') {
+        throw new Error("Password is required");
+      }
+      if (formData.password.length < 6) {
+        throw new Error("Password must be at least 6 characters long");
+      }
+      
+      // If validation passes, move to next section
+      setCurrentSection(2);
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   const prevSection = () => {

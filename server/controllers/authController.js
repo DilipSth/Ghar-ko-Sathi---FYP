@@ -59,7 +59,20 @@ const registerUser = async (req, res) => {
     const savedUser = await newUser.save();
     res.status(201).json(savedUser);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("User registration error:", error);
+    
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ error: validationErrors.join(', ') });
+    }
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    res.status(500).json({ error: "Registration failed. Please try again." });
   }
 };
 
@@ -72,7 +85,7 @@ const registerServiceProvider = async (req, res) => {
       password,
       dob,
       gender,
-      services, // Now an array of service IDs (e.g., ["id1", "id2"])
+      services,
       phoneNo,
       role = "serviceProvider",
       question,
@@ -120,13 +133,26 @@ const registerServiceProvider = async (req, res) => {
       citizenshipImage,
       certificationImage,
       question,
-      services, // Array of ObjectIds
+      services,
     });
 
     const savedServiceProvider = await newServiceProvider.save();
     res.status(201).json(savedServiceProvider);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Service provider registration error:", error);
+    
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ error: validationErrors.join(', ') });
+    }
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    res.status(500).json({ error: "Registration failed. Please try again." });
   }
 };
 

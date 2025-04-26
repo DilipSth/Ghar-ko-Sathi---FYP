@@ -129,22 +129,6 @@ const Login = () => {
             {loading ? "Logging in..." : "Log In"}
           </button>
 
-          {/* Social Media Login Options */}
-          <div className="flex justify-between mt-4">
-            <button 
-              type="button" 
-              className="flex items-center justify-center w-full p-2 mr-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-200"
-            >
-              <FaGoogle className="mr-2" /> Google
-            </button>
-            <button 
-              type="button" 
-              className="flex items-center justify-center w-full p-2 ml-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition duration-200"
-            >
-              <FaFacebook className="mr-2" /> Facebook
-            </button>
-          </div>
-
           {/* Sign Up Link */}
           <p className="mt-8 text-center text-sm">
             Don&apos;t have an account?{" "}
