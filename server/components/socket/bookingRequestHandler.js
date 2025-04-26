@@ -147,6 +147,50 @@ const handleBookingRequest = (socket, io, connectedUsers, bookings) => {
       socket.emit("bookingConfirmedSuccess", booking);
     }
   });
+
+  // Handle booking cancellation
+  socket.on("cancelBooking", (data) => {
+    const { bookingId, reason, cancelledBy, cancelTime } = data;
+    const booking = bookings.get(bookingId);
+
+    if (booking && ['pending', 'accepted', 'confirmed'].includes(booking.status)) {
+      booking.status = 'cancelled';
+      booking.details.cancellation = {
+        reason,
+        cancelledBy,
+        cancelTime
+      };
+      bookings.set(bookingId, booking);
+
+      // Find the socket ID of the other party to notify them
+      let targetSocketId = null;
+      let targetRole = cancelledBy === 'user' ? 'serviceProvider' : 'user';
+      let targetId = cancelledBy === 'user' ? booking.providerId : booking.userId;
+
+      for (const [socketId, info] of connectedUsers) {
+        if (info.userId === targetId && info.role === targetRole) {
+          targetSocketId = socketId;
+          break;
+        }
+      }
+
+      // Send cancellation notification to the other party
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("bookingCancelled", {
+          bookingId,
+          message: `Booking was cancelled by ${cancelledBy === 'user' ? 'the user' : 'the service provider'}`,
+          reason,
+          cancelTime
+        });
+      }
+
+      // Confirm cancellation to the cancelling party
+      socket.emit("bookingCancellationConfirmed", {
+        bookingId,
+        message: "Booking cancelled successfully"
+      });
+    }
+  });
 };
 
 export default handleBookingRequest; 

@@ -94,6 +94,56 @@ const ProviderBookingManager = () => {
     };
     
     bookingService.registerSocketEvents(handlers);
+
+    socket.on("bookingCancelled", (data) => {
+      console.log("Booking cancelled:", data);
+      
+      // Show notification when booking is cancelled by user
+      toast.info(data.message, {
+        duration: 5000,
+        icon: '❌',
+        style: {
+          borderRadius: '10px',
+          background: '#FF4B4B',
+          color: '#fff',
+        },
+      });
+      
+      if (data.reason) {
+        toast.info(`Reason: ${data.reason}`, {
+          duration: 5000,
+          style: {
+            borderRadius: '10px',
+            background: '#4A5568',
+            color: '#fff',
+          },
+        });
+      }
+      
+      // Remove the cancelled booking from the list
+      setPendingBookings(prev => prev.filter(b => b.bookingId !== data.bookingId));
+      setActiveBookings(prev => prev.filter(b => b.bookingId !== data.bookingId));
+      loadBookings(); // Refresh the booking lists
+    });
+
+    socket.on("bookingCancellationConfirmed", (data) => {
+      console.log("Booking cancellation confirmed:", data);
+      
+      toast.success(data.message, {
+        duration: 5000,
+        icon: '✔️',
+        style: {
+          borderRadius: '10px',
+          background: '#48BB78',
+          color: '#fff',
+        },
+      });
+      
+      // Remove the cancelled booking from the list
+      setPendingBookings(prev => prev.filter(b => b.bookingId !== data.bookingId));
+      setActiveBookings(prev => prev.filter(b => b.bookingId !== data.bookingId));
+      loadBookings(); // Refresh the booking lists
+    });
   };
 
   const loadBookings = async () => {

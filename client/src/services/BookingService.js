@@ -488,6 +488,30 @@ class BookingService {
         throw error;
       });
   }
+
+  /**
+   * Cancel a booking (can be called by either user or service provider)
+   * @param {String} bookingId - ID of booking to cancel
+   * @param {String} reason - Reason for cancellation
+   * @param {String} cancelledBy - Either 'user' or 'provider'
+   */
+  cancelBooking(bookingId, reason = '', cancelledBy = 'user') {
+    if (!this.socket) {
+      return Promise.reject('Socket not available');
+    }
+    
+    this.updateBookingStatus(bookingId, 'cancelled');
+    
+    const cancelData = {
+      bookingId,
+      reason,
+      cancelledBy,
+      cancelTime: new Date().toISOString()
+    };
+    
+    this.socket.emit('cancelBooking', cancelData);
+    return Promise.resolve({ success: true, bookingId });
+  }
 }
 
 // Export singleton instance

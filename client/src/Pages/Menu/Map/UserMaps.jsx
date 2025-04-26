@@ -13,6 +13,7 @@ import { LiveTracking } from "../../../Components";
 import { useLocation } from "react-router-dom";
 import { toast } from 'react-toastify';
 import paymentService from "../../../services/PaymentService";
+import bookingService from "../../../services/BookingService";
 
 const UserMaps = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -267,6 +268,52 @@ const UserMaps = () => {
       toast.info(`Service details updated: Total Rs. ${calculatedTotal}`);
     });
 
+    socket.on("bookingCancelled", (data) => {
+      console.log("Booking cancelled:", data);
+      
+      // Show notification when booking is cancelled
+      toast.info(data.message, {
+        duration: 5000,
+        icon: '❌',
+        style: {
+          borderRadius: '10px',
+          background: '#FF4B4B',
+          color: '#fff',
+        },
+      });
+      
+      if (data.reason) {
+        toast.info(`Reason: ${data.reason}`, {
+          duration: 5000,
+          style: {
+            borderRadius: '10px',
+            background: '#4A5568',
+            color: '#fff',
+          },
+        });
+      }
+      
+      setBookingState("idle");
+      setBookingDetails(null);
+    });
+
+    socket.on("bookingCancellationConfirmed", (data) => {
+      console.log("Booking cancellation confirmed:", data);
+      
+      toast.success(data.message, {
+        duration: 5000,
+        icon: '✔️',
+        style: {
+          borderRadius: '10px',
+          background: '#48BB78',
+          color: '#fff',
+        },
+      });
+      
+      setBookingState("idle");
+      setBookingDetails(null);
+    });
+
     return () => {
       socket.off("bookingAccepted");
       socket.off("bookingDeclined");
@@ -279,6 +326,8 @@ const UserMaps = () => {
       socket.off("reviewSubmitted");
       socket.off("location-update");
       socket.off("maintenanceDetailsUpdated");
+      socket.off("bookingCancelled");
+      socket.off("bookingCancellationConfirmed");
     };
   }, [socket]);
 
@@ -616,7 +665,35 @@ const UserMaps = () => {
     }
   };
 
-  const resetBooking = useCallback(() => {
+  const resetBooking = useCallback(async () => {
+    if (bookingDetails?.bookingId) {
+      try {
+        await bookingService.cancelBooking(bookingDetails.bookingId, 'Cancelled by user', 'user');
+        
+        // Show notification to the user that they cancelled the booking
+        toast.info('You cancelled the service provider booking', {
+          duration: 5000,
+          icon: '❌',
+          style: {
+            borderRadius: '10px',
+            background: '#FF4B4B',
+            color: '#fff',
+          },
+        });
+
+        // Set booking state to cancelled first
+        setBookingState("cancelled");
+        
+        // Wait for 2 seconds to show the cancellation message
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
+        console.error('Error cancelling booking:', error);
+        toast.error('Failed to cancel booking');
+      }
+    }
+    
+    // Reset all states
     setSelectedProvider(null);
     setBookingState("idle");
     setBookingDetails(null);
@@ -628,7 +705,7 @@ const UserMaps = () => {
     setProviderLocation(null);
     setProviderEta(null);
     setProviderDistance(null);
-  }, []);
+  }, [bookingDetails]);
 
   const [locationName, setLocationName] = useState("");
   const locationNameCache = useRef({});
@@ -1157,6 +1234,26 @@ const UserMaps = () => {
                               </p>
                             </div>
                           </div>
+                          {/* Notification Panel */}
+                          {bookingState === "cancelled" && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                                <div className="ml-3">
+                                  <h3 className="text-sm font-medium text-red-800">
+                                    Booking Cancelled
+                                  </h3>
+                                  <div className="mt-1 text-sm text-red-700">
+                                    You have cancelled your service request.
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <button
                             onClick={resetBooking}
                             className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
