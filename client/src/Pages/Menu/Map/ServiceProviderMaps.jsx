@@ -563,12 +563,13 @@ const ServiceProviderMap = () => {
                     </div>
                   </div>
                 </div>
-                <div className="h-full w-full" style={{ minHeight: "500px", height: "calc(100vh - 300px)" }}>
+                <div className="flex-1 relative" style={{ minHeight: "calc(100vh - 180px)" }}>
                   <RealTimeMap
                     onLocationUpdate={handleLocationUpdate}
                     providerLocation={currentPosition}
                     userLocation={currentRequest?.userLocation}
                     showUserMarker={!!currentRequest}
+                    className="absolute inset-0 w-full h-full"
                   />
                 </div>
               </div>
