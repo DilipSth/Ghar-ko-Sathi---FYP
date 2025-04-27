@@ -922,59 +922,45 @@ const UserMaps = () => {
                     </div>
                   )}
                   
-                  {/* Enhanced location banner above map */}
-                  <div className="p-3 bg-blue-50 mb-3 rounded-lg shadow-sm">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
-                      <div className="flex items-center mb-2 sm:mb-0">
-                        <div className="bg-blue-500 text-white p-2 rounded-full mr-2">
+                  {/* Provider location info when needed */}
+                  {providerLocation && (bookingState === "accepted" || bookingState === "confirmed" || bookingState === "ongoing") && (
+                    <div className="p-3 bg-blue-50 mb-3 rounded-lg shadow-sm">
+                      <div className="flex items-center">
+                        <div className="bg-green-500 text-white p-2 rounded-full mr-2">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                            <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                            <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
                           </svg>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Your Location</p>
-                          <p className="text-sm font-medium">{locationName || "Loading..."}</p>
+                          <p className="text-xs text-gray-500">Service Provider Location</p>
+                          <p className="text-sm font-medium">
+                            {providerLocation.locationName || 
+                              `${providerLocation.lat.toFixed(4)}, ${providerLocation.lng.toFixed(4)}`}
+                          </p>
                         </div>
                       </div>
                       
-                      {providerLocation && (bookingState === "accepted" || bookingState === "confirmed" || bookingState === "ongoing") && (
-                        <div className="flex items-center">
-                          <div className="bg-green-500 text-white p-2 rounded-full mr-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                              <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
+                      {providerDistance && (
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-100">
+                          <div className="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
                             </svg>
+                            <span className="text-sm">Distance: <strong>{providerDistance} km</strong></span>
                           </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Service Provider Location</p>
-                            <p className="text-sm font-medium">
-                              {providerLocation.locationName || 
-                                `${providerLocation.lat.toFixed(4)}, ${providerLocation.lng.toFixed(4)}`}
-                            </p>
-                          </div>
+                          {providerEta && (
+                            <div className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-sm">ETA: <strong>{providerEta} mins</strong></span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                    
-                    {providerDistance && (bookingState === "accepted" || bookingState === "confirmed" || bookingState === "ongoing") && (
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-100">
-                        <div className="flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-sm">Distance: <strong>{providerDistance} km</strong></span>
-                        </div>
-                        {providerEta && (
-                          <div className="flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                            </svg>
-                            <span className="text-sm">ETA: <strong>{providerEta} mins</strong></span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  )}
                   
                   <div className="h-full w-full" style={{ minHeight: "400px", height: "calc(100vh - 250px)" }}>
                     {bookingState === "idle" ? (
