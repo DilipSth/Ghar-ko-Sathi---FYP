@@ -962,13 +962,13 @@ const UserMaps = () => {
                     </div>
                   )}
                   
-                  <div className="h-full w-full" style={{ minHeight: "400px", height: "calc(100vh - 250px)" }}>
+                  <div className="flex-1 relative" style={{ minHeight: "calc(100vh - 180px)" }}>
                     {bookingState === "idle" ? (
                       <RealTimeMap
                         onLocationUpdate={(position) => setCurrentPosition(position)}
                         providerLocation={currentPosition}
                         showUserMarker={false}
-                        className="h-full"
+                        className="absolute inset-0 w-full h-full"
                       />
                     ) : (
                       <LiveTracking
@@ -979,6 +979,7 @@ const UserMaps = () => {
                         bookingState={bookingState}
                         setBookingDetails={setBookingDetails}
                         showOnlyUserLocation={true}
+                        className="absolute inset-0 w-full h-full"
                       />
                     )}
                   </div>

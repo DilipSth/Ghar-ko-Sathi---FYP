@@ -50,14 +50,12 @@ const RealTimeMap = ({
   center = [27.7172, 85.324] // Default to Kathmandu, Nepal
 }) => {
   return (
-    <div className={`rounded-sm border border-stroke bg-white py-6 px-7.5 shadow-default dark:border-strokedark dark:bg-boxdark ${className}`}>
-      <h4 className="mb-2 text-xl font-semibold text-black dark:text-white">
-        Live Location
-      </h4>
+    <div className={`h-full w-full ${className}`}>
       <MapContainer
         center={center}
         zoom={zoom}
-        style={{ height: "40vh", width: "100%" }}
+        style={{ height: "100%", width: "100%" }}
+        className="h-full w-full"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
