@@ -5,6 +5,7 @@ import { LiveTracking } from "../../../Components";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";
+import RealTimeMap from "../../../Components/Maps/RealTimeMap";
 
 const ServiceProviderMap = () => {
   const { user } = useAuth();
@@ -280,10 +281,30 @@ const ServiceProviderMap = () => {
     setBookingState("idle");
   };
 
-  const handlePositionUpdate = (position) => {
-    setCurrentPosition(position);
+  const handleLocationUpdate = (location) => {
+    setCurrentPosition({
+      lat: location.lat,
+      lng: location.lng
+    });
+    
     // Save position to localStorage whenever it updates
-    localStorage.setItem("serviceProviderPosition", JSON.stringify(position));
+    localStorage.setItem("serviceProviderPosition", JSON.stringify({
+      lat: location.lat,
+      lng: location.lng
+    }));
+
+    // Only send location updates when there's an active booking
+    if (bookingState === "accepted" || bookingState === "confirmed" || bookingState === "ongoing") {
+      if (socket && currentRequest) {
+        socket.emit("location-update", {
+          bookingId: currentRequest._id || currentRequest.bookingId,
+          location: { lat: location.lat, lng: location.lng },
+          locationName: locationName,
+          distance: distanceToUser,
+          eta: etaToUser
+        });
+      }
+    }
   };
 
   // Separate useEffect for location name to prevent infinite loops
@@ -397,112 +418,6 @@ const ServiceProviderMap = () => {
       }));
     }
   };
-
-  // Send position updates to user
-  useEffect(() => {
-    let watchId;
-
-    // Define getLocationName function that can be called from successCallback
-    const getLocationName = async (latitude, longitude) => {
-      try {
-        // Add a check to ensure latitude and longitude are valid
-        if (latitude === undefined || longitude === undefined) {
-          console.error("Invalid coordinates:", latitude, longitude);
-          return;
-        }
-        
-        // Use the Nominatim API to get a proper location name from coordinates
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch location name: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const displayName = data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-        setLocationName(displayName);
-      } catch (error) {
-        console.error("Error getting location name:", error);
-        
-        // Only try to format coordinates if they are valid numbers
-        if (typeof latitude === 'number' && typeof longitude === 'number') {
-          setLocationName(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-        } else {
-          setLocationName("Unknown location");
-        }
-      }
-    };
-
-    const successCallback = (position) => {
-      const { latitude, longitude } = position.coords;
-      
-      // Set currentPosition as an object with lat/lng properties, not an array
-      setCurrentPosition({
-        lat: latitude,
-        lng: longitude
-      });
-      
-      // Call getLocationName with the coordinates
-      getLocationName(latitude, longitude);
-
-      // Only send location updates when there's an active booking
-      if (bookingState === "accepted" || bookingState === "confirmed" || bookingState === "ongoing") {
-        // Calculate distance and ETA if we have a user booking
-        let distanceToUser = null;
-        let etaToUser = null;
-        
-        if (currentRequest && currentRequest.details && currentRequest.details.userLocation) {
-          const userLat = currentRequest.details.userLocation.lat;
-          const userLng = currentRequest.details.userLocation.lng;
-          
-          // Calculate distance in kilometers
-          distanceToUser = calculateDistance(
-            latitude, 
-            longitude, 
-            userLat, 
-            userLng
-          );
-          
-          // Estimate ETA based on average speed (30 km/h)
-          const averageSpeedKmPerHour = 30;
-          if (distanceToUser) {
-            // Time in minutes = (distance in km / speed in km per hour) * 60
-            etaToUser = Math.round((distanceToUser / averageSpeedKmPerHour) * 60);
-          }
-        }
-        
-        if (socket && currentRequest) {
-          socket.emit("location-update", {
-            bookingId: currentRequest._id || currentRequest.bookingId,
-            location: { lat: latitude, lng: longitude },
-            locationName: locationName,
-            distance: distanceToUser,
-            eta: etaToUser
-          });
-        }
-      }
-    };
-
-    const errorCallback = (error) => {
-      console.error("Error getting location:", error);
-    };
-
-    if (navigator.geolocation) {
-      watchId = navigator.geolocation.watchPosition(
-        successCallback,
-        errorCallback,
-        { enableHighAccuracy: true }
-      );
-    }
-
-    return () => {
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-    };
-  }, [bookingState, currentRequest, socket, locationName]);
 
   // Add these helper functions before the return statement
   const deg2rad = (deg) => {
@@ -649,10 +564,11 @@ const ServiceProviderMap = () => {
                   </div>
                 </div>
                 <div className="h-full w-full" style={{ minHeight: "500px", height: "calc(100vh - 300px)" }}>
-                  <LiveTracking
-                    bookingDetails={currentRequest}
-                    showDirections={bookingState === "ongoing"}
-                    onPositionUpdate={handlePositionUpdate}
+                  <RealTimeMap
+                    onLocationUpdate={handleLocationUpdate}
+                    providerLocation={currentPosition}
+                    userLocation={currentRequest?.userLocation}
+                    showUserMarker={!!currentRequest}
                   />
                 </div>
               </div>
@@ -934,7 +850,7 @@ const ServiceProviderMap = () => {
                       providerId: user.id,
                     }}
                     showDirections={true}
-                    onPositionUpdate={handlePositionUpdate}
+                    onPositionUpdate={handleLocationUpdate}
                   />
                 </div>
 
@@ -1017,7 +933,7 @@ const ServiceProviderMap = () => {
                       providerId: user.id,
                     }}
                     showDirections={true}
-                    onPositionUpdate={handlePositionUpdate}
+                    onPositionUpdate={handleLocationUpdate}
                   />
                 </div>
 
@@ -1125,7 +1041,7 @@ const ServiceProviderMap = () => {
                       providerId: user.id,
                     }}
                     showDirections={true}
-                    onPositionUpdate={handlePositionUpdate}
+                    onPositionUpdate={handleLocationUpdate}
                   />
                 </div>
 
@@ -1324,26 +1240,33 @@ const ServiceProviderMap = () => {
           {bookingState === "completed" && currentRequest && (
             <div className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4 pointer-events-auto">
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                <h3 className="text-xl font-bold mb-4">Job Completed</h3>
-                <p className="text-gray-600 mb-4">Waiting for user review.</p>
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-green-500 rounded-full mx-auto flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">Job Completed Successfully!</h3>
+                  <p className="text-gray-600">Waiting for user review.</p>
+                </div>
 
                 {/* Display maintenance details if available */}
                 {(currentRequest.maintenanceNotes ||
                   currentRequest.maintenancePrice) && (
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                    <h4 className="font-medium mb-2">Service Details</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h4 className="font-medium mb-3">Service Details</h4>
                     {currentRequest.maintenanceNotes && (
-                      <div className="mb-2">
-                        <p className="text-sm font-semibold">Service Notes:</p>
-                        <p className="text-sm">
+                      <div className="mb-3">
+                        <p className="text-sm font-semibold text-gray-700">Service Notes:</p>
+                        <p className="text-sm text-gray-600">
                           {currentRequest.maintenanceNotes}
                         </p>
                       </div>
                     )}
                     {currentRequest.maintenancePrice && (
                       <div>
-                        <p className="text-sm font-semibold">Price:</p>
-                        <p className="text-lg font-bold">
+                        <p className="text-sm font-semibold text-gray-700">Price:</p>
+                        <p className="text-lg font-bold text-green-600">
                           Rs. {currentRequest.maintenancePrice}
                         </p>
                       </div>
@@ -1353,8 +1276,11 @@ const ServiceProviderMap = () => {
 
                 <button
                   onClick={goBackToIdle}
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium flex items-center justify-center"
                 >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
                   Back to Dashboard
                 </button>
               </div>
@@ -1363,35 +1289,61 @@ const ServiceProviderMap = () => {
           {bookingState === "reviewed" && currentRequest && (
             <div className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4 pointer-events-auto">
               <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-                <h3 className="text-xl font-bold mb-4">Review Received</h3>
-                <div className="space-y-2 mb-6">
-                  <p className="text-sm">
-                    <span className="font-semibold">Rating:</span>{" "}
-                    {currentRequest.review.rating} ★
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">Comment:</span>{" "}
-                    {currentRequest.review.comment}
-                  </p>
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-yellow-400 rounded-full mx-auto flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">Review Received!</h3>
+                  <p className="text-gray-600 mb-4">The user has submitted their feedback.</p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center mb-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <svg
+                          key={star}
+                          className={`w-6 h-6 ${
+                            star <= currentRequest.review.rating
+                              ? "text-yellow-400"
+                              : "text-gray-300"
+                          }`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                    </div>
+                    <p className="text-center text-gray-700 font-medium">
+                      Rating: {currentRequest.review.rating} out of 5
+                    </p>
+                    <div className="border-t border-gray-200 pt-3">
+                      <p className="text-sm font-semibold text-gray-700 mb-1">Feedback:</p>
+                      <p className="text-gray-600 italic">"{currentRequest.review.comment}"</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Display maintenance details if available */}
                 {(currentRequest.maintenanceNotes ||
                   currentRequest.maintenancePrice) && (
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                    <h4 className="font-medium mb-2">Service Details</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h4 className="font-medium mb-3">Service Details</h4>
                     {currentRequest.maintenanceNotes && (
-                      <div className="mb-2">
-                        <p className="text-sm font-semibold">Service Notes:</p>
-                        <p className="text-sm">
+                      <div className="mb-3">
+                        <p className="text-sm font-semibold text-gray-700">Service Notes:</p>
+                        <p className="text-sm text-gray-600">
                           {currentRequest.maintenanceNotes}
                         </p>
                       </div>
                     )}
                     {currentRequest.maintenancePrice && (
                       <div>
-                        <p className="text-sm font-semibold">Price:</p>
-                        <p className="text-lg font-bold">
+                        <p className="text-sm font-semibold text-gray-700">Price:</p>
+                        <p className="text-lg font-bold text-green-600">
                           Rs. {currentRequest.maintenancePrice}
                         </p>
                       </div>
@@ -1401,8 +1353,11 @@ const ServiceProviderMap = () => {
 
                 <button
                   onClick={goBackToIdle}
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium flex items-center justify-center"
                 >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
                   Back to Dashboard
                 </button>
               </div>

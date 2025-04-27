@@ -14,6 +14,7 @@ import { useLocation } from "react-router-dom";
 import { toast } from 'react-toastify';
 import paymentService from "../../../services/PaymentService";
 import bookingService from "../../../services/BookingService";
+import RealTimeMap from "../../../Components/Maps/RealTimeMap";
 
 const UserMaps = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -976,15 +977,24 @@ const UserMaps = () => {
                   </div>
                   
                   <div className="h-full w-full" style={{ minHeight: "400px", height: "calc(100vh - 250px)" }}>
-                    <LiveTracking
-                      bookingDetails={bookingDetails}
-                      showDirections={bookingState === "ongoing" || bookingState === "accepted" || bookingState === "confirmed"}
-                      serviceProviders={filteredProviders}
-                      onPositionUpdate={(position) => setCurrentPosition(position)}
-                      bookingState={bookingState}
-                      setBookingDetails={setBookingDetails}
-                      showOnlyUserLocation={true}
-                    />
+                    {bookingState === "idle" ? (
+                      <RealTimeMap
+                        onLocationUpdate={(position) => setCurrentPosition(position)}
+                        providerLocation={currentPosition}
+                        showUserMarker={false}
+                        className="h-full"
+                      />
+                    ) : (
+                      <LiveTracking
+                        bookingDetails={bookingDetails}
+                        showDirections={bookingState === "ongoing" || bookingState === "accepted" || bookingState === "confirmed"}
+                        serviceProviders={filteredProviders}
+                        onPositionUpdate={(position) => setCurrentPosition(position)}
+                        bookingState={bookingState}
+                        setBookingDetails={setBookingDetails}
+                        showOnlyUserLocation={true}
+                      />
+                    )}
                   </div>
                 </div>
 
