@@ -380,9 +380,6 @@ export default function Header({ toggleSidebar }) {
 
         <div className="flex items-center lg:justify-end gap-10 max-sm:gap-4">
           <div className="flex flex-row gap-5">
-            <span>
-              <IoSearch className="max-lg:hidden text-[#333333] text-[24px] cursor-pointer transition ease-in-out duration-500 max-sm:text-[18px]" />
-            </span>
             <span onClick={handleChatClick} className="cursor-pointer relative">
               <CiPaperplane className="text-[#333333] text-[24px] transition ease-in-out duration-500 max-sm:text-[18px] hover:text-blue-500" />
             </span>

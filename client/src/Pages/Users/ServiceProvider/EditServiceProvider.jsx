@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-hot-toast";
+import { fetchServices } from "../../../utils/servicesHelper";
 
 const EditServiceProvider = () => {
   const { id } = useParams();
@@ -13,10 +14,11 @@ const EditServiceProvider = () => {
     dob: "",
     role: "serviceProvider",
     gender: "",
-    services: "",
+    services: [],
     question: "",
   });
   const [loading, setLoading] = useState(true);
+  const [allServices, setAllServices] = useState([]);
 
   useEffect(() => {
     const fetchProvider = async () => {
@@ -29,13 +31,32 @@ const EditServiceProvider = () => {
             },
           }
         );
-        setProvider(response.data.provider);
+        // Ensure services is an array of IDs
+        let services = response.data.provider.services;
+        if (Array.isArray(services)) {
+          services = services.map(s => (typeof s === 'object' && s !== null ? s._id : s));
+        } else if (typeof services === 'string') {
+          services = [services];
+        } else {
+          services = [];
+        }
+        setProvider({ ...response.data.provider, services });
       } finally {
         setLoading(false);
       }
     };
+    const fetchAllServices = async () => {
+      const services = await fetchServices();
+      setAllServices(services);
+    };
     fetchProvider();
+    fetchAllServices();
   }, [id]);
+
+  const handleServiceChange = (e) => {
+    const selected = Array.from(e.target.selectedOptions).map(option => option.value);
+    setProvider(prev => ({ ...prev, services: selected }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -139,15 +160,18 @@ const EditServiceProvider = () => {
         </div>
         <div>
           <label className="block text-gray-700">Services</label>
-          <input
-            type="text"
-            placeholder="Services"
-            value={provider.services}
-            onChange={(e) =>
-              setProvider({ ...provider, services: e.target.value })
-            }
-            className="w-full p-2 border rounded"
-          />
+          <div className="w-full p-2 border rounded bg-gray-50">
+            {allServices
+              .filter(service => provider.services.includes(service._id))
+              .map(service => (
+                <div key={service._id} className="py-1 px-2">
+                  {service.ser_name}
+                </div>
+              ))}
+            {provider.services.length === 0 && (
+              <div className="text-gray-400">No services selected</div>
+            )}
+          </div>
         </div>
         <div>
           <label className="block text-gray-700">Security Question</label>

@@ -10,8 +10,6 @@ const Users = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState("");
-  const [selectedType, setSelectedType] = useState("");
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -35,6 +33,7 @@ const Users = () => {
           profileImage: user.profileImage
             ? `http://localhost:8000/public/registerImage/${user.profileImage}`
             : null,
+          gender: user.gender || "N/A",
         }));
         setUsers(data);
       }
@@ -76,11 +75,9 @@ const Users = () => {
   };
 
   const filteredUsers = users.filter((user) => {
-    const matchesStatus = selectedStatus
-      ? user.status === selectedStatus
-      : true;
-    const matchesType = selectedType ? user.type === selectedType : true;
-    return matchesStatus && matchesType;
+    // Filter out admin users
+    const isNotAdmin = user.type !== "admin";
+    return isNotAdmin;
   });
 
   return (
@@ -89,41 +86,6 @@ const Users = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Users</h1>
-        </div>
-
-        {/* Filters */}
-        <div className="flex justify-evenly my-4">
-          <div>
-            <label className="mr-4 font-medium" htmlFor="statusFilter">
-              Filter by Status:
-            </label>
-            <select
-              id="statusFilter"
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="rounded-md border border-stroke py-2 px-3 text-black"
-            >
-              <option value="">All</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mr-4 font-medium" htmlFor="typeFilter">
-              Filter by Type:
-            </label>
-            <select
-              id="typeFilter"
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="rounded-md border border-stroke py-2 px-3 text-black"
-            >
-              <option value="">All</option>
-              <option value="Service Provider">Service Provider</option>
-              <option value="User">User</option>
-            </select>
-          </div>
         </div>
 
         {/* Users Table */}
@@ -138,7 +100,7 @@ const Users = () => {
                 <th className="p-4">Mobile</th>
                 <th className="p-4">Email</th>
                 <th className="p-4">Type</th>
-                <th className="p-4">Status</th>
+                <th className="p-4">Gender</th>
                 <th className="p-4">Action</th>
               </tr>
             </thead>
@@ -160,17 +122,7 @@ const Users = () => {
                   <td className="p-4">{user.mobile}</td>
                   <td className="p-4">{user.email}</td>
                   <td className="p-4">{user.type}</td>
-                  <td className="p-4">
-                    <span
-                      className={`inline-flex items-center justify-center w-20 h-8 rounded ${
-                        user.status === "Active"
-                          ? "bg-green-100 text-green-600"
-                          : "bg-red-100 text-red-600"
-                      }`}
-                    >
-                      {user.status}
-                    </span>
-                  </td>
+                  <td className="p-4">{user.gender}</td>
                   <td>
                     <button
                       onClick={() =>
@@ -189,12 +141,14 @@ const Users = () => {
                     >
                       <FaEdit />
                     </button>
-                    <button
-                      onClick={() => handleDelete(user._id)}
-                      className="mr-2 rounded-md border border-[#c13d3d] text-[#c13d3d] py-1 px-3 text-center font-medium hover:bg-[#c13d3d] hover:text-white duration-200"
-                    >
-                      <MdDeleteForever />
-                    </button>
+                    {user.type !== "admin" && (
+                      <button
+                        onClick={() => handleDelete(user._id)}
+                        className="mr-2 rounded-md border border-[#c13d3d] text-[#c13d3d] py-1 px-3 text-center font-medium hover:bg-[#c13d3d] hover:text-white duration-200"
+                      >
+                        <MdDeleteForever />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

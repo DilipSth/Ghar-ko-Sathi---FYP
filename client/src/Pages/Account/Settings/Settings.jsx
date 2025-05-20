@@ -461,36 +461,30 @@ const Settings = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Services Offered
                         </label>
-                        <div className="border border-gray-300 rounded-md p-3 max-h-40 overflow-y-auto">
+                        <div className="border border-gray-300 rounded-md p-3 max-h-40 overflow-y-auto bg-gray-50">
                           {availableServices.length > 0 ? (
-                            availableServices.map((service) => (
-                              <label key={service._id} className="flex items-center space-x-2 py-1">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedServices.includes(service._id)}
-                                  onChange={() => handleServiceChange(service._id)}
-                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                />
-                                <span>{service.ser_name}</span>
-                              </label>
-                            ))
+                            availableServices
+                              .filter(service => selectedServices.includes(service._id))
+                              .map(service => (
+                                <div key={service._id} className="py-1 px-2">
+                                  {service.ser_name}
+                                </div>
+                              ))
                           ) : (
                             <p className="text-gray-500">No services available</p>
                           )}
+                          {selectedServices.length === 0 && (
+                            <div className="text-gray-400">No services selected</div>
+                          )}
                         </div>
                       </div>
-
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Experience / Qualifications
                         </label>
-                        <textarea
-                          name="question"
-                          value={userData.question}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          rows="3"
-                        />
+                        <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 min-h-[48px]">
+                          {userData.question || <span className="text-gray-400">No experience/qualifications provided</span>}
+                        </div>
                       </div>
                     </div>
                   </div>

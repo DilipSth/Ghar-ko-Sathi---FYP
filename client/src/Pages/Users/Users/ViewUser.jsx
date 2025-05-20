@@ -6,6 +6,8 @@ const ViewUser = () => {
   const [user, setUser] = useState(null);
   const { id } = useParams();
   const navigate = useNavigate();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalImage, setModalImage] = useState("");
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -27,6 +29,16 @@ const ViewUser = () => {
     };
     fetchUser();
   }, [id]);
+
+  const handleImageClick = (imgUrl) => {
+    setModalImage(imgUrl);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalImage("");
+  };
 
   if (!user)
     return <p className="text-center text-lg font-semibold">Loading...</p>;
@@ -52,7 +64,19 @@ const ViewUser = () => {
               <img
                 src={`http://localhost:8000/public/registerImage/${user.profileImage}`}
                 alt="Profile"
-                className="w-32 h-32 object-cover rounded-md"
+                className="w-32 h-32 object-cover rounded-md cursor-pointer hover:scale-105 transition-transform"
+                onClick={() => handleImageClick(`http://localhost:8000/public/registerImage/${user.profileImage}`)}
+              />
+            )}
+          </div>
+          <div className="flex flex-col items-center justify-center">
+            <h2 className="text-2xl font-semibold mt-6 mb-4">Citizenship</h2>
+            {user.citizenshipImage && (
+              <img
+                src={`http://localhost:8000/public/registerImage/${user.citizenshipImage}`}
+                alt="Citizenship"
+                className="w-32 h-32 object-cover rounded-md cursor-pointer hover:scale-105 transition-transform"
+                onClick={() => handleImageClick(`http://localhost:8000/public/registerImage/${user.citizenshipImage}`)}
               />
             )}
           </div>
@@ -65,6 +89,24 @@ const ViewUser = () => {
           Edit
         </button>
       </div>
+      {/* Modal for image preview */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="relative">
+            <img
+              src={modalImage}
+              alt="Preview"
+              className="max-w-[90vw] max-h-[80vh] rounded-lg shadow-lg border-4 border-white"
+            />
+            <button
+              onClick={closeModal}
+              className="absolute top-2 right-2 bg-white rounded-full px-3 py-1 text-black text-lg font-bold shadow hover:bg-gray-200"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

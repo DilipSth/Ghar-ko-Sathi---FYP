@@ -6,6 +6,8 @@ const ViewServiceProvider = () => {
   const [provider, setProvider] = useState(null);
   const { id } = useParams();
   const navigate = useNavigate();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalImage, setModalImage] = useState("");
 
   useEffect(() => {
     const fetchServiceProvider = async () => {
@@ -29,6 +31,16 @@ const ViewServiceProvider = () => {
     };
     fetchServiceProvider();
   }, [id]);
+
+  const handleImageClick = (imgUrl) => {
+    setModalImage(imgUrl);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalImage("");
+  };
 
   if (!provider)
     return <p className="text-center text-lg font-semibold">Loading...</p>;
@@ -68,7 +80,15 @@ const ViewServiceProvider = () => {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <strong>Services:</strong> {provider.services}
+            <strong>Services:</strong> {Array.isArray(provider.services)
+              ? provider.services.map((service, idx) =>
+                  typeof service === 'object' && service !== null && service.ser_name
+                    ? service.ser_name
+                    : typeof service === 'string'
+                      ? service
+                      : ''
+                ).filter(Boolean).join(', ')
+              : (provider.services || 'N/A')}
           </div>
           <div>
             <strong>Question:</strong> {provider.question}
@@ -84,7 +104,8 @@ const ViewServiceProvider = () => {
                 <img
                   src={`http://localhost:8000/public/registerImage/${provider.profileImage}`}
                   alt="Profile"
-                  className="w-32 h-32 object-cover rounded-md"
+                  className="w-32 h-32 object-cover rounded-md cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => handleImageClick(`http://localhost:8000/public/registerImage/${provider.profileImage}`)}
                 />
               </div>
             )}
@@ -97,7 +118,8 @@ const ViewServiceProvider = () => {
                 <img
                   src={`http://localhost:8000/public/registerImage/${provider.citizenshipImage}`}
                   alt="Citizenship"
-                  className="w-32 h-32 object-cover rounded-md"
+                  className="w-32 h-32 object-cover rounded-md cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => handleImageClick(`http://localhost:8000/public/registerImage/${provider.citizenshipImage}`)}
                 />
               </div>
             )}
@@ -110,7 +132,8 @@ const ViewServiceProvider = () => {
                 <img
                   src={`http://localhost:8000/public/registerImage/${provider.certificationImage}`}
                   alt="Certification"
-                  className="w-32 h-32 object-cover rounded-md"
+                  className="w-32 h-32 object-cover rounded-md cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => handleImageClick(`http://localhost:8000/public/registerImage/${provider.certificationImage}`)}
                 />
               </div>
             )}
@@ -126,6 +149,25 @@ const ViewServiceProvider = () => {
           Edit
         </button>
       </div>
+
+      {/* Modal for image preview */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="relative">
+            <img
+              src={modalImage}
+              alt="Preview"
+              className="max-w-[90vw] max-h-[80vh] rounded-lg shadow-lg border-4 border-white"
+            />
+            <button
+              onClick={closeModal}
+              className="absolute top-2 right-2 bg-white rounded-full px-3 py-1 text-black text-lg font-bold shadow hover:bg-gray-200"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
