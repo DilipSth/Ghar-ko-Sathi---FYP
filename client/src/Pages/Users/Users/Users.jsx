@@ -142,12 +142,12 @@ const Users = () => {
                       <FaEdit />
                     </button>
                     {user.type !== "admin" && (
-                      <button
-                        onClick={() => handleDelete(user._id)}
-                        className="mr-2 rounded-md border border-[#c13d3d] text-[#c13d3d] py-1 px-3 text-center font-medium hover:bg-[#c13d3d] hover:text-white duration-200"
-                      >
-                        <MdDeleteForever />
-                      </button>
+                    <button
+                      onClick={() => handleDelete(user._id)}
+                      className="mr-2 rounded-md border border-[#c13d3d] text-[#c13d3d] py-1 px-3 text-center font-medium hover:bg-[#c13d3d] hover:text-white duration-200"
+                    >
+                      <MdDeleteForever />
+                    </button>
                     )}
                   </td>
                 </tr>

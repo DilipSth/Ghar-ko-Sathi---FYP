@@ -894,7 +894,7 @@ const UserMaps = () => {
             {activeTab === "map" && (
               <div className="flex-1 flex flex-col lg:flex-row gap-4">
                 {/* Map Section */}
-                <div className="flex-1 lg:w-2/3 overflow-hidden bg-white shadow-md rounded-lg">
+                <div className="lg:w-2/3 overflow-hidden bg-white shadow-md rounded-lg">
                   {error && (
                     <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
                       <p>{error}</p>
@@ -962,7 +962,7 @@ const UserMaps = () => {
                     </div>
                   )}
                   
-                  <div className="flex-1 relative" style={{ minHeight: "calc(100vh - 180px)" }}>
+                  <div className="flex-1 relative h-[400px] rounded-lg overflow-hidden border border-gray-200">
                     {bookingState === "idle" ? (
                       <RealTimeMap
                         onLocationUpdate={(position) => setCurrentPosition(position)}
@@ -978,7 +978,8 @@ const UserMaps = () => {
                         onPositionUpdate={(position) => setCurrentPosition(position)}
                         bookingState={bookingState}
                         setBookingDetails={setBookingDetails}
-                        showOnlyUserLocation={true}
+                        // Show only user location if in idle state, otherwise show full tracking
+                        showOnlyUserLocation={bookingState === "idle"}
                         className="absolute inset-0 w-full h-full"
                       />
                     )}

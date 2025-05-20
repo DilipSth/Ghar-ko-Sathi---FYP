@@ -27,7 +27,15 @@ const PaymentOptions = ({ booking }) => {
       if (selectedMethod === 'cash') {
         const response = await paymentService.markAsCashPayment(booking._id);
         toast.success('Booking marked as paid by cash');
-        navigate(`/booking/${booking._id}?paymentSuccess=true`);
+        // After successful cash payment, set localStorage and navigate to dashboard for review
+        localStorage.setItem('showReviewForm', 'true');
+        localStorage.setItem('reviewBookingId', booking._id);
+        // Assuming booking object in PaymentOptions has providerId and name
+        if (booking.providerId) {
+           localStorage.setItem('reviewProviderId', booking.providerId._id || booking.providerId);
+           localStorage.setItem('reviewProviderName', booking.providerId.name || 'Service Provider');
+        }
+        navigate('/dashboard');
       } else if (selectedMethod === 'esewa') {
         const response = await paymentService.initiateEsewaPayment(booking._id);
         if (response.success) {

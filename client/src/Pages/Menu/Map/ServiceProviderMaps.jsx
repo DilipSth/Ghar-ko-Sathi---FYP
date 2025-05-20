@@ -37,9 +37,13 @@ const ServiceProviderMap = () => {
   const [jobDuration, setJobDuration] = useState(0); // in hours
   const [materials, setMaterials] = useState([]);
   const [materialName, setMaterialName] = useState("");
-  const [materialCost, setMaterialCost] = useState("");
+  const [materialCost, setMaterialCost] = useState(0);
   const [error, setError] = useState(null);
   const mapRef = useRef(null);
+  // State for additional charges specifically
+  const [additionalChargeValue, setAdditionalChargeValue] = useState(0);
+  // State to manage the step in the ongoing job popup
+  const [ongoingStep, setOngoingStep] = useState('details'); // 'details' or 'maintenance'
 
   // Calculate distance between two points in kilometers
   const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
@@ -268,7 +272,10 @@ const ServiceProviderMap = () => {
         const durationHours = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60)));
         setJobDuration(durationHours);
       }
-      
+
+      // Reset the ongoing step when completing the job
+      setOngoingStep('details');
+
       socket.emit("completeJob", {
         bookingId: currentRequest.bookingId,
         completedBy: "provider",
@@ -363,7 +370,7 @@ const ServiceProviderMap = () => {
       };
       setMaterials([...materials, newMaterial]);
       setMaterialName("");
-      setMaterialCost("");
+      setMaterialCost(0);
     }
   };
 
@@ -389,11 +396,8 @@ const ServiceProviderMap = () => {
       // Calculate total material cost
       const materialCost = calculateMaterialCost();
       
-      // Parse additional charges (or default to 0 if invalid)
-      const additionalCharge = parseFloat(maintenancePrice) || 0;
-      
       // Calculate total maintenance price (hourly charge + material cost + additional charges)
-      const maintenanceTotal = hourlyCharge + materialCost + additionalCharge;
+      const maintenanceTotal = hourlyCharge + materialCost + additionalChargeValue;
       
       const maintenanceDetails = {
         jobDuration,
@@ -401,11 +405,12 @@ const ServiceProviderMap = () => {
         hourlyCharge,
         materials,
         materialCost,
-        additionalCharge,
+        additionalCharge: additionalChargeValue,
         maintenancePrice: maintenanceTotal,
         maintenanceNotes
       };
       
+      console.log("Sending maintenance details:", maintenanceDetails);
       socket.emit("updateMaintenanceDetails", {
         bookingId: currentRequest.bookingId,
         ...maintenanceDetails
@@ -982,216 +987,238 @@ const ServiceProviderMap = () => {
           )}
           {bookingState === "ongoing" && currentRequest && (
             <div className="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center p-4 pointer-events-auto">
-              <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
+              <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6 flex flex-col h-full">
                 <h3 className="text-xl font-bold mb-4">Service in Progress</h3>
-                
-                {/* Location information panel */}
-                <div className="bg-blue-50 p-3 rounded-lg mb-4">
-                  <div className="flex items-center mb-2">
-                    <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Your Location:</p>
-                      <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="bg-green-500 text-white p-1 rounded-full mr-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">User Location:</p>
-                      <p className="text-sm font-medium">
-                        {currentRequest.details.userLocationName || "Current Location"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 mb-4">
-                  <p className="text-sm">
-                    <span className="font-semibold">Service:</span>{" "}
-                    {currentRequest.details.service}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">Phone:</span>{" "}
-                    {currentRequest.details.userPhone || currentRequest.userPhone}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">Location:</span>{" "}
-                    {currentRequest.details.userLocationName || currentRequest.userLocationName}
-                  </p>
-                  {currentRequest.details.description && (
-                    <p className="text-sm">
-                      <span className="font-semibold">User's Description:</span>{" "}
-                      {currentRequest.details.description}
-                    </p>
-                  )}
-                </div>
 
-                <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
-                  <LiveTracking
-                    bookingDetails={{
-                      ...currentRequest,
-                      userLocation: currentRequest.userLocation,
-                      providerId: user.id,
-                    }}
-                    showDirections={true}
-                    onPositionUpdate={handleLocationUpdate}
-                  />
-                </div>
-
-                {distance && eta && (
-                  <div className="bg-blue-50 p-3 rounded-lg mb-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm font-medium">Distance to user</p>
-                        <p className="text-lg font-bold">{distance} km</p>
+                {/* Render content based on ongoingStep */}
+                {ongoingStep === 'details' && (
+                  <div className="flex-1 overflow-y-auto pr-4 -mr-4">
+                    {/* Location information panel */}
+                    <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                      <div className="flex items-center mb-2">
+                        <div className="bg-blue-500 text-white p-1 rounded-full mr-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Your Location:</p>
+                          <p className="text-sm font-medium">{locationName || "Detecting location..."}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">Estimated arrival</p>
-                        <p className="text-lg font-bold">{eta} minutes</p>
+                      <div className="flex items-center">
+                        <div className="bg-green-500 text-white p-1 rounded-full mr-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">User Location:</p>
+                          <p className="text-sm font-medium">
+                            {currentRequest.details.userLocationName || "Current Location"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm">
+                        <span className="font-semibold">Service:</span>{" "}
+                        {currentRequest.details.service}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-semibold">Phone:</span>{" "}
+                        {currentRequest.details.userPhone || currentRequest.userPhone}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-semibold">Location:</span>{" "}
+                        {currentRequest.details.userLocationName || currentRequest.userLocationName}
+                      </p>
+                      {currentRequest.details.description && (
+                        <p className="text-sm">
+                          <span className="font-semibold">User&apos;s Description:</span>{" "}
+                          {currentRequest.details.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="h-48 mb-4 rounded-lg overflow-hidden border border-gray-200">
+                      <LiveTracking
+                        bookingDetails={{
+                          ...currentRequest,
+                          userLocation: currentRequest.userLocation,
+                          providerId: user.id,
+                        }}
+                        showDirections={true}
+                        onPositionUpdate={handleLocationUpdate}
+                      />
+                    </div>
+
+                    {distance && eta && (
+                      <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm font-medium">Distance to user</p>
+                            <p className="text-lg font-bold">{distance} km</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">Estimated arrival</p>
+                            <p className="text-lg font-bold">{eta} minutes</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Next Button to proceed to Maintenance Details */}
+                    <button
+                      onClick={() => setOngoingStep('maintenance')}
+                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 mt-4"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {ongoingStep === 'maintenance' && (
+                  <div className="flex-1 overflow-y-auto pr-4 -mr-4">
+                    {/* Maintenance Details Form */}
+                    <div className="border rounded-lg p-3 mb-4">
+                      <h4 className="font-medium mb-2">Maintenance Details</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">
+                            Service Notes
+                          </label>
+                          <textarea
+                            className="w-full border rounded-lg p-2 text-sm"
+                            rows="3"
+                            placeholder="Enter details about the service performed"
+                            value={maintenanceNotes}
+                            onChange={(e) => setMaintenanceNotes(e.target.value)}
+                          ></textarea>
+                        </div>
+
+                        {/* Hourly Charge Display */}
+                        <div className="bg-blue-50 p-2 rounded">
+                          <p className="text-sm font-medium">Hourly Charge</p>
+                          <p className="text-sm">
+                            {jobDuration} {jobDuration === 1 ? "hour" : "hours"} × Rs. 200 = Rs. {jobDuration * 200}
+                          </p>
+                        </div>
+
+                        {/* Materials Section */}
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">
+                            Materials Used
+                          </label>
+                          <div className="flex space-x-2 mb-2">
+                            <input
+                              type="text"
+                              className="flex-1 border rounded-lg p-2 text-sm"
+                              placeholder="Material name"
+                              value={materialName}
+                              onChange={(e) => setMaterialName(e.target.value)}
+                            />
+                            <input
+                              type="number"
+                              className="w-24 border rounded-lg p-2 text-sm"
+                              placeholder="Cost"
+                              value={materialCost}
+                              onChange={(e) => setMaterialCost(parseFloat(e.target.value) || 0)}
+                            />
+                            <button
+                              onClick={addMaterial}
+                              className="bg-green-500 text-white px-2 rounded-lg hover:bg-green-600 text-sm"
+                            >
+                              Add
+                            </button>
+                          </div>
+
+                          {/* Materials List */}
+                          {materials.length > 0 && (
+                            <div className="mb-2 border rounded-lg p-2 bg-gray-50">
+                              <p className="text-sm font-medium mb-1">Added Materials:</p>
+                              <ul className="space-y-1">
+                                {materials.map((material, index) => (
+                                  <li key={index} className="flex justify-between text-sm">
+                                    <span>{material.name}</span>
+                                    <div className="flex space-x-2">
+                                      <span>Rs. {material.cost}</span>
+                                      <button
+                                        onClick={() => removeMaterial(index)}
+                                        className="text-red-500 hover:text-red-700"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  </li>
+                                ))}
+                                <li className="pt-1 border-t text-sm font-medium">
+                                  <div className="flex justify-between">
+                                    <span>Total Material Cost:</span>
+                                    <span>Rs. {calculateMaterialCost()}</span>
+                                  </div>
+                                </li>
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">
+                            Additional Charges (Rs)
+                          </label>
+                          <input
+                            type="number"
+                            className="w-full border rounded-lg p-2 text-sm"
+                            placeholder="Enter additional charges if any"
+                            value={additionalChargeValue}
+                            onChange={(e) => setAdditionalChargeValue(parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+
+                        {/* Total Price Display */}
+                        <div className="bg-green-50 p-2 rounded">
+                          <p className="text-sm font-medium">Total Price</p>
+                          <p className="text-lg font-bold">
+                            Rs. {(jobDuration * 200) + calculateMaterialCost() + additionalChargeValue}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={handleMaintenanceSubmit}
+                          className="w-full bg-blue-500 text-white py-1 rounded-lg hover:bg-blue-600 text-sm"
+                        >
+                          Save Details
+                        </button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Add maintenance details form */}
-                <div className="border rounded-lg p-3 mb-4">
-                  <h4 className="font-medium mb-2">Maintenance Details</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">
-                        Service Notes
-                      </label>
-                      <textarea
-                        className="w-full border rounded-lg p-2 text-sm"
-                        rows="3"
-                        placeholder="Enter details about the service performed"
-                        value={maintenanceNotes}
-                        onChange={(e) => setMaintenanceNotes(e.target.value)}
-                      ></textarea>
-                    </div>
-                    
-                    {/* Hourly Charge Display */}
-                    <div className="bg-blue-50 p-2 rounded">
-                      <p className="text-sm font-medium">Hourly Charge</p>
-                      <p className="text-sm">
-                        {jobDuration} {jobDuration === 1 ? "hour" : "hours"} × Rs. 200 = Rs. {jobDuration * 200}
-                      </p>
-                    </div>
-                    
-                    {/* Materials Section */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">
-                        Materials Used
-                      </label>
-                      <div className="flex space-x-2 mb-2">
-                        <input
-                          type="text"
-                          className="flex-1 border rounded-lg p-2 text-sm"
-                          placeholder="Material name"
-                          value={materialName}
-                          onChange={(e) => setMaterialName(e.target.value)}
-                        />
-                        <input
-                          type="number"
-                          className="w-24 border rounded-lg p-2 text-sm"
-                          placeholder="Cost"
-                          value={materialCost}
-                          onChange={(e) => setMaterialCost(e.target.value)}
-                        />
-                        <button
-                          onClick={addMaterial}
-                          className="bg-green-500 text-white px-2 rounded-lg hover:bg-green-600 text-sm"
-                        >
-                          Add
-                        </button>
-                      </div>
-                      
-                      {/* Materials List */}
-                      {materials.length > 0 && (
-                        <div className="mb-2 border rounded-lg p-2 bg-gray-50">
-                          <p className="text-sm font-medium mb-1">Added Materials:</p>
-                          <ul className="space-y-1">
-                            {materials.map((material, index) => (
-                              <li key={index} className="flex justify-between text-sm">
-                                <span>{material.name}</span>
-                                <div className="flex space-x-2">
-                                  <span>Rs. {material.cost}</span>
-                                  <button
-                                    onClick={() => removeMaterial(index)}
-                                    className="text-red-500 hover:text-red-700"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              </li>
-                            ))}
-                            <li className="pt-1 border-t text-sm font-medium">
-                              <div className="flex justify-between">
-                                <span>Total Material Cost:</span>
-                                <span>Rs. {calculateMaterialCost()}</span>
-                              </div>
-                            </li>
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">
-                        Additional Charges (Rs)
-                      </label>
-                      <input
-                        type="number"
-                        className="w-full border rounded-lg p-2 text-sm"
-                        placeholder="Enter additional charges if any"
-                        value={maintenancePrice}
-                        onChange={(e) => setMaintenancePrice(e.target.value)}
-                      />
-                    </div>
-                    
-                    {/* Total Price Display */}
-                    <div className="bg-green-50 p-2 rounded">
-                      <p className="text-sm font-medium">Total Price</p>
-                      <p className="text-lg font-bold">
-                        Rs. {(jobDuration * 200) + calculateMaterialCost() + (parseFloat(maintenancePrice) || 0)}
-                      </p>
-                    </div>
-                    
+                {/* Complete Job Button (only shown on maintenance step) */}
+                {ongoingStep === 'maintenance' && (
+                  <div className="mt-4">
                     <button
-                      onClick={handleMaintenanceSubmit}
-                      className="w-full bg-blue-500 text-white py-1 rounded-lg hover:bg-blue-600 text-sm"
+                      onClick={completeJob}
+                      className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center"
                     >
-                      Save Details
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5 mr-2"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Complete Job
                     </button>
                   </div>
-                </div>
-
-                <button
-                  onClick={completeJob}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Complete Job
-                </button>
+                )}
               </div>
             </div>
           )}

@@ -10,6 +10,7 @@ import {
   updateServiceProvider,
   approveServiceProvider,
   deleteServiceProvider,
+  getUsersAndProvidersCount,
 } from "../controllers/usersController.js";
 import verifyUser from "../middleware/authMiddleware.js";
 
@@ -25,5 +26,6 @@ router.get("/serviceProvider/:id", getServiceProviderById);
 router.put("/serviceProvider/:id", verifyUser, updateServiceProvider);
 router.put("/serviceProvider/approve/:id", approveServiceProvider);
 router.delete("/serviceProvider/:id", deleteServiceProvider);
+router.get("/counts", getUsersAndProvidersCount);
 
 export default router;

@@ -53,22 +53,46 @@ const PaymentSuccess = () => {
         
         // Get booking details to show provider information
         try {
-          const response = await axios.get(`/api/bookings/${bookingId}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`
+          const response = await axios.get(
+            `/api/bookings/${bookingId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
             }
-          });
+          );
           console.log("Booking details response:", response.data);
-          setBookingDetails(response.data.booking);
+          const fetchedBookingDetails = response.data.booking;
+          setBookingDetails(fetchedBookingDetails);
+
+          // Set localStorage flags and navigate to dashboard to show review form
+          localStorage.setItem('showReviewForm', 'true');
+          localStorage.setItem('reviewBookingId', bookingId);
+
+          if (fetchedBookingDetails?.providerId?._id) {
+            localStorage.setItem('reviewProviderId', fetchedBookingDetails.providerId._id);
+            localStorage.setItem('reviewProviderName', fetchedBookingDetails.providerId.name || 'Service Provider');
+          } else if (fetchedBookingDetails?.providerId) {
+            localStorage.setItem('reviewProviderId', fetchedBookingDetails.providerId);
+            localStorage.setItem('reviewProviderName', 'Service Provider');
+          }
+
+          // Navigate to dashboard with the review tab active
+          navigate('/dashboard?showReview=true');
+
+          // Show success toast (optional, might happen before navigation)
+          toast.success('Payment processed successfully!');
+
+          // No need to set loading to false here as we are navigating away
+          // setLoading(false);
+
         } catch (err) {
-          console.error('Error fetching booking details:', err);
+          console.error('Error fetching booking details after payment success:', err);
+          // Even if booking details fetch fails, redirect to dashboard
+          toast.success('Payment processed, but could not fetch booking details for review.');
+          navigate('/dashboard'); // Redirect to dashboard without showing review form
+          setLoading(false);
         }
-        
-        // Show success toast
-        toast.success('Payment processed successfully!');
-        
-        // If we got payment details successfully, we don't need to query booking API again
-        setLoading(false);
       } catch (error) {
         console.error('Error loading payment details:', error);
         setError('Could not verify payment details. Please check your dashboard for booking status.');
@@ -77,7 +101,7 @@ const PaymentSuccess = () => {
     };
     
     loadBookingDetails();
-  }, [bookingId]);
+  }, [bookingId, navigate]);
   
   const handleGoToDashboard = () => {
     // Navigate to main dashboard (not in a new page)

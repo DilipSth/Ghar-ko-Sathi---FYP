@@ -42,7 +42,7 @@ const Dashboard = () => {
     // Fetch user counts
     const fetchCounts = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/users/count');
+        const response = await axios.get('http://localhost:8000/api/users/counts');
         setUserCount(response.data.userCount);
         setServiceProviderCount(response.data.serviceProviderCount);
         setTotalCount(response.data.totalCount);
@@ -65,6 +65,16 @@ const Dashboard = () => {
       setShowReviewForm(true);
     }
   }, [location.search]);
+
+  // Check localStorage for review information on mount
+  useEffect(() => {
+    const showReview = localStorage.getItem('showReviewForm') === 'true';
+    if (showReview) {
+      setShowReviewForm(true);
+      // Optionally clear the flag after showing the form
+      // localStorage.removeItem('showReviewForm');
+    }
+  }, []);
 
   // Handle location update from RealTimeMap
   const handleLocationUpdate = async (position) => {

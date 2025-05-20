@@ -12,16 +12,19 @@ const ReviewForm = ({ onClose }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   useEffect(() => {
-    // Get review data from localStorage
-    const showReview = localStorage.getItem('showReviewForm');
-    if (showReview === 'true') {
-      const storedBookingId = localStorage.getItem('reviewBookingId');
-      const storedProviderId = localStorage.getItem('reviewProviderId');
-      const storedProviderName = localStorage.getItem('reviewProviderName');
-      
-      if (storedBookingId) setBookingId(storedBookingId);
-      if (storedProviderId) setProviderId(storedProviderId);
-      if (storedProviderName) setProviderName(storedProviderName);
+    // Retrieve provider information from localStorage
+    const storedProviderId = localStorage.getItem('reviewProviderId');
+    const storedProviderName = localStorage.getItem('reviewProviderName');
+    const storedBookingId = localStorage.getItem('reviewBookingId');
+
+    if (storedProviderId) {
+      setProviderId(storedProviderId);
+    }
+    if (storedProviderName) {
+      setProviderName(storedProviderName);
+    }
+    if (storedBookingId) {
+      setBookingId(storedBookingId);
     }
   }, []);
 

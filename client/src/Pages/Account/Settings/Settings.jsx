@@ -469,7 +469,7 @@ const Settings = () => {
                                 <div key={service._id} className="py-1 px-2">
                                   {service.ser_name}
                                 </div>
-                              ))
+                            ))
                           ) : (
                             <p className="text-gray-500">No services available</p>
                           )}

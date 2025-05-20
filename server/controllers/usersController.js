@@ -175,6 +175,19 @@ const deleteServiceProvider = async (req, res) => {
   }
 };
 
+// Get the counts of users and service providers
+const getUsersAndProvidersCount = async (req, res) => {
+  try {
+    const userCount = await User.countDocuments({ role: 'user' });
+    const serviceProviderCount = await ServiceProvider.countDocuments({});
+    const totalCount = userCount + serviceProviderCount;
+    return res.status(200).json({ success: true, userCount, serviceProviderCount, totalCount });
+  } catch (error) {
+    console.error("Error fetching user and service provider counts:", error);
+    return res.status(500).json({ success: false, error: "Server Error" });
+  }
+};
+
 export {
   getUsers,
   getCurrentUser,
@@ -186,4 +199,5 @@ export {
   updateServiceProvider,
   approveServiceProvider,
   deleteServiceProvider,
+  getUsersAndProvidersCount,
 };
