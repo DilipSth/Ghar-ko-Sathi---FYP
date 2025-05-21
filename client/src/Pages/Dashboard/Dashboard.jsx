@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import PropTypes from 'prop-types';
 import axios from "axios";
 import { useNavigate, useLocation } from 'react-router-dom';
-import RealTimeMap from "../../Components/Maps/RealTimeMap";
+import { LiveTracking } from "../../Components/Map";
 import { ReviewForm } from "../../Components";
 
 const Dashboard = () => {
@@ -180,12 +180,10 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="h-[400px] rounded border border-gray-200 relative">
-              <RealTimeMap
-                onLocationUpdate={handleLocationUpdate}
-                providerLocation={currentPosition}
-                showUserMarker={false}
-                zoom={15}
-                center={[currentPosition.lat, currentPosition.lng]}
+              <LiveTracking
+                onPositionUpdate={handleLocationUpdate}
+                showOnlyUserLocation={true}
+                bookingState="idle"
                 className="h-full"
               />
             </div>

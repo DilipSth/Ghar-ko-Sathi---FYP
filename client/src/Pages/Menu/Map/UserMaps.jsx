@@ -9,12 +9,84 @@ import {
 import axios from "axios";
 import { useAuth } from "../../../context/authContext";
 import { SocketContext } from "../../../context/SocketContext";
-import { LiveTracking } from "../../../Components";
 import { useLocation } from "react-router-dom";
 import { toast } from 'react-toastify';
 import paymentService from "../../../services/PaymentService";
 import bookingService from "../../../services/BookingService";
-import RealTimeMap from "../../../Components/Maps/RealTimeMap";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+// Fix the default icon issue with leaflet in webpack
+import icon from "leaflet/dist/images/marker-icon.png";
+import iconShadow from "leaflet/dist/images/marker-shadow.png";
+
+let DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
+
+// Custom marker component to handle user and provider locations
+const DynamicMarkers = ({ userPosition, providerPosition, bookingState, onUserLocationFound }) => {
+  const map = useMapEvents({
+    // Optional: recenter map on user location when bookingState is idle
+    locationfound(e) {
+      if (bookingState === 'idle') {
+         // Prevent re-centering on every position update if already centered
+         const center = map.getCenter();
+         const distanceToCenter = center.distanceTo(e.latlng);
+         if (distanceToCenter > 50) { // Recenter if more than 50 meters away
+             map.flyTo(e.latlng, map.getZoom());
+         }
+       }
+       // Call the parent handler with the new location
+       if (onUserLocationFound) {
+         onUserLocationFound(e.latlng);
+       }
+    },
+  });
+
+
+  useEffect(() => {
+    // Attempt to locate user when map is idle or accepted/confirmed
+    if (bookingState === 'idle') {
+      map.locate({ enableHighAccuracy: true, watch: true, timeout: 5000 });
+    } else if (bookingState === 'accepted' || bookingState === 'confirmed' || bookingState === 'ongoing') {
+      map.locate({ enableHighAccuracy: true, watch: true, timeout: 5000 });
+      // Fit bounds to include both markers if both are available
+      if (userPosition && providerPosition) {
+        const bounds = L.latLngBounds([userPosition, providerPosition]);
+        map.fitBounds(bounds, { padding: [50, 50] }); // Add some padding
+      }
+    } else {
+       // Stop watching location when no longer needed
+       map.stopLocate();
+    }
+
+    // Cleanup function to stop watching location on component unmount
+    return () => {
+       map.stopLocate();
+    };
+  }, [map, bookingState, userPosition, providerPosition]);
+
+  // Render markers based on booking state
+  return (
+    <>
+      {userPosition && (
+        <Marker position={userPosition}>
+          <Popup>Your Location</Popup>
+        </Marker>
+      )}
+      {(bookingState === 'accepted' || bookingState === 'confirmed' || bookingState === 'ongoing') && providerPosition && (
+        <Marker position={providerPosition}>
+          <Popup>Service Provider Location</Popup>
+        </Marker>
+      )}
+    </>
+  );
+};
 
 const UserMaps = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -706,21 +778,11 @@ const UserMaps = () => {
     setProviderLocation(null);
     setProviderEta(null);
     setProviderDistance(null);
+    setCurrentPosition(null); // Clear user position on reset
   }, [bookingDetails]);
 
   const [locationName, setLocationName] = useState("");
   const locationNameCache = useRef({});
-
-  const mockLocationData = useMemo(
-    () => ({
-      "27.7172,85.3238": "Kathmandu, Nepal",
-      "27.6933,85.3424": "Patan, Lalitpur, Nepal",
-      "27.6710,85.4298": "Bhaktapur, Nepal",
-      "27.7030,85.3143": "Kirtipur, Nepal",
-      "27.7500,85.3500": "Budhanilkantha, Nepal",
-    }),
-    []
-  );
 
   const getLocationName = useCallback(
     async (lat, lng) => {
@@ -732,24 +794,30 @@ const UserMaps = () => {
         return locationNameCache.current[cacheKey];
       }
 
-      for (const [mockCoords, mockName] of Object.entries(mockLocationData)) {
-        const [mockLat, mockLng] = mockCoords.split(",").map(Number);
-        if (Math.abs(mockLat - lat) < 0.01 && Math.abs(mockLng - lng) < 0.01) {
-          locationNameCache.current[cacheKey] = mockName;
-          return mockName;
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch location name: ${response.status}`);
         }
+        
+        const data = await response.json();
+        const displayName = data.display_name || 
+          `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        
+        locationNameCache.current[cacheKey] = displayName;
+        return displayName;
+      } catch (error) {
+        console.error("Error getting location name from API:", error);
+        // Fallback to just coordinates if API fails
+        const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        locationNameCache.current[cacheKey] = fallback;
+        return fallback;
       }
-
-      let fallbackName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-      if (lat > 27.6 && lat < 27.8 && lng > 85.2 && lng < 85.5) {
-        fallbackName += " (Kathmandu Valley)";
-      }
-
-      locationNameCache.current[cacheKey] = fallbackName;
-      return fallbackName;
     },
-    [mockLocationData]
+    [locationNameCache]
   );
 
   useEffect(() => {
@@ -844,6 +912,15 @@ const UserMaps = () => {
     return value;
   };
 
+  // Handle location update from RealTimeMap (now from DynamicMarkers)
+  const handleLocationUpdate = useCallback(async (position) => {
+    setCurrentPosition(position);
+    localStorage.setItem("userCurrentPosition", JSON.stringify(position));
+    // No need to setMapLoading(false) here as we removed the old map logic
+    const name = await getLocationName(position.lat, position.lng);
+    setLocationName(name);
+  }, [getLocationName]);
+
   return (
     <div className="h-screen flex flex-col">
       <div className="p-4 h-full">
@@ -866,26 +943,6 @@ const UserMaps = () => {
               onClick={() => setActiveTab("map")}
             >
               Find Services
-            </button>
-            <button
-              className={`py-2 px-4 font-medium ${
-                activeTab === "bookings"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500"
-              }`}
-              onClick={() => setActiveTab("bookings")}
-            >
-              My Bookings
-            </button>
-            <button
-              className={`py-2 px-4 font-medium ${
-                activeTab === "history"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500"
-              }`}
-              onClick={() => setActiveTab("history")}
-            >
-              Service History
             </button>
           </div>
           
@@ -962,27 +1019,35 @@ const UserMaps = () => {
                     </div>
                   )}
                   
+                  {/* Display current location name */}
+                  {locationName && activeTab === 'map' && (
+                    <div className="p-3 bg-gray-50 mb-3 rounded-lg shadow-sm">
+                      <p className="text-xs text-gray-500">Your Current Location</p>
+                      <p className="text-sm font-medium">{locationName}</p>
+                    </div>
+                  )}
+                  
                   <div className="flex-1 relative h-[400px] rounded-lg overflow-hidden border border-gray-200">
-                    {bookingState === "idle" ? (
-                      <RealTimeMap
-                        onLocationUpdate={(position) => setCurrentPosition(position)}
-                        providerLocation={currentPosition}
-                        showUserMarker={false}
-                        className="absolute inset-0 w-full h-full"
+                    <MapContainer
+                      center={currentPosition || [27.7172, 85.324]} // Default to Kathmandu if position is null
+                      zoom={15}
+                      style={{ height: "100%", width: "100%" }}
+                      whenCreated={mapInstance => {
+                        // Optional: Store map instance if needed for later access
+                        // mapRef.current = mapInstance;
+                      }}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
-                    ) : (
-                      <LiveTracking
-                        bookingDetails={bookingDetails}
-                        showDirections={bookingState === "ongoing" || bookingState === "accepted" || bookingState === "confirmed"}
-                        serviceProviders={filteredProviders}
-                        onPositionUpdate={(position) => setCurrentPosition(position)}
-                        bookingState={bookingState}
-                        setBookingDetails={setBookingDetails}
-                        // Show only user location if in idle state, otherwise show full tracking
-                        showOnlyUserLocation={bookingState === "idle"}
-                        className="absolute inset-0 w-full h-full"
-                      />
-                    )}
+                      <DynamicMarkers 
+                         userPosition={currentPosition} 
+                         providerPosition={providerLocation} 
+                         bookingState={bookingState}
+                         onUserLocationFound={handleLocationUpdate} // Pass the handler down
+                       />
+                    </MapContainer>
                   </div>
                 </div>
 
@@ -1706,136 +1771,6 @@ const UserMaps = () => {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-            
-            {activeTab === "bookings" && (
-              <div className="flex-1 bg-white rounded-lg shadow-lg p-4">
-                <h4 className="font-semibold mb-4">Current Bookings</h4>
-                {bookingDetails && bookingState !== "idle" && bookingState !== "completed" && bookingState !== "paid" && bookingState !== "reviewed" ? (
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="flex items-center mb-4">
-                      <div className="bg-blue-100 p-3 rounded-full mr-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h5 className="font-semibold text-lg">Active Booking</h5>
-                        <p className="text-sm text-gray-600">
-                          {bookingDetails.details?.providerName || "Service Provider"} - {bookingDetails.details?.service}
-                        </p>
-                      </div>
-                      <div className="ml-auto">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          bookingState === "waiting" ? "bg-yellow-100 text-yellow-800" : 
-                          bookingState === "accepted" ? "bg-blue-100 text-blue-800" : 
-                          bookingState === "confirmed" ? "bg-purple-100 text-purple-800" : 
-                          bookingState === "ongoing" ? "bg-green-100 text-green-800" :
-                          "bg-gray-100 text-gray-800"
-                        }`}>
-                          {bookingState === "waiting" ? "Pending" : 
-                           bookingState === "accepted" ? "Accepted" : 
-                           bookingState === "confirmed" ? "Confirmed" : 
-                           bookingState === "ongoing" ? "In Progress" : 
-                           bookingState}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Status:</span>
-                        <span className="font-medium">{
-                          bookingState === "waiting" ? "Waiting for confirmation" : 
-                          bookingState === "accepted" ? "Accepted by provider" : 
-                          bookingState === "confirmed" ? "Confirmed" : 
-                          bookingState === "ongoing" ? "Service in progress" : 
-                          bookingState === "provider-completed" ? "Awaiting your confirmation" : 
-                          bookingState
-                        }</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Provider:</span>
-                        <span className="font-medium">{bookingDetails.details?.providerName || "Unknown"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Service:</span>
-                        <span className="font-medium">{bookingDetails.details?.service || "General Service"}</span>
-                      </div>
-                      {providerDistance && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Distance:</span>
-                          <span className="font-medium">{providerDistance} km</span>
-                        </div>
-                      )}
-                      {providerEta && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Estimated Arrival:</span>
-                          <span className="font-medium">{providerEta} mins</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Description:</span>
-                        <span className="font-medium text-right max-w-[200px]">{bookingDetails.description || bookingDetails.details?.description || "No description"}</span>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex justify-end">
-                      <button 
-                        onClick={() => setActiveTab("map")}
-                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                      >
-                        View on Map
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-10 text-gray-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p>No active bookings</p>
-                    <button 
-                      onClick={() => setActiveTab("map")} 
-                      className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      Find a Service Provider
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {activeTab === "history" && (
-              <div className="flex-1 bg-white rounded-lg shadow-lg p-4">
-                <h4 className="font-semibold mb-4">Service History</h4>
-                {bookingHistory.length > 0 ? (
-                  <div className="space-y-3">
-                    {bookingHistory.map((booking) => (
-                      <div key={booking.id} className="bg-gray-50 p-4 rounded-lg">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h5 className="font-semibold">{booking.provider.name}</h5>
-                            <p className="text-sm text-gray-600">{booking.provider.service}</p>
-                            <p className="text-xs text-gray-500">{booking.date}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-gray-900">Rs. {booking.cost}</p>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                              {booking.status}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 text-gray-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <p>No service history yet</p>
-                  </div>
-                )}
               </div>
             )}
           </div>

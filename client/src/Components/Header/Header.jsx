@@ -1,7 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useRef, useState, useEffect } from "react";
 import { LuBell } from "react-icons/lu";
-import { IoSearch } from "react-icons/io5";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { CiPaperplane } from "react-icons/ci";
 import { useAuth } from "../../context/authContext";
@@ -373,7 +372,7 @@ export default function Header({ toggleSidebar }) {
               {userData?.name || user?.name || 'Welcome'}
             </h1>
             <p className="text-sm max-sm:text-sm font-light text-[#333333]">
-              Stay up-to-date with the data provided below.
+              Where your service needs meet expert hands.
             </p>
           </div>
         </div>
